@@ -51,10 +51,10 @@ export function displaySprints(sprints) {
 
     console.log();
     console.log(chalk.cyan(line));
-    const ptsDisplay = seqPoints < points ? `${seqPoints}/${points}` : `${points}`;
+    const ptsDisplay = seqPoints < points ? `seq ${seqPoints} · total ${points} pts` : `${points} pts`;
     console.log(
       chalk.cyan.bold(` Sprint ${i + 1}`) +
-        chalk.gray(`${' '.repeat(Math.max(1, WIDTH - 18 - ptsDisplay.length))}${ptsDisplay} pts`)
+        chalk.gray(`${' '.repeat(Math.max(1, WIDTH - 12 - ptsDisplay.length))}${ptsDisplay}`)
     );
     console.log(chalk.cyan(line));
 
