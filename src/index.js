@@ -35,21 +35,17 @@ if (!urlMatch) {
 const jiraUrl = urlMatch[1];
 const epicKey = urlMatch[2];
 
-async function main() {
-  try {
-    const issues = await fetchEpicIssues({ url: jiraUrl, token, user, epicKey });
+try {
+  const issues = await fetchEpicIssues({ url: jiraUrl, token, user, epicKey });
 
-    if (issues.length === 0) {
-      console.log('No issues found in epic.');
-      return;
-    }
-
-    const sprints = schedulesprints(issues, opts.points, opts.seq);
-    displaySprints(sprints);
-  } catch (err) {
-    console.error('Error:', err.message);
-    process.exit(1);
+  if (issues.length === 0) {
+    console.log('No issues found in epic.');
+    process.exit(0);
   }
-}
 
-main();
+  const sprints = schedulesprints(issues, opts.points, opts.seq);
+  displaySprints(sprints);
+} catch (err) {
+  console.error('Error:', err.message);
+  process.exit(1);
+}
