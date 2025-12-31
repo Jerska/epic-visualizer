@@ -17,26 +17,35 @@ export function displaySprints(sprints) {
     const points = sprint.reduce((sum, issue) => sum + issue.points, 0);
     totalPoints += points;
 
-    // Calculate sequential points (sum of max points per level within sprint)
-    // and mark tasks on the sprint's critical sequence
-    const byLevel = new Map();
-    for (const issue of sprint) {
-      if (!byLevel.has(issue.level)) byLevel.set(issue.level, []);
-      byLevel.get(issue.level).push(issue);
-    }
-    const maxPointsPerLevel = [...byLevel.values()].map((issues) => Math.max(...issues.map((i) => i.points)));
-    const seqPoints = maxPointsPerLevel.reduce((sum, pts) => sum + pts, 0);
+    // Calculate chain lengths based on actual dependencies within sprint
+    const sprintKeys = new Set(sprint.map((i) => i.key));
+    const chainLength = new Map();
+    const chainPrev = new Map(); // Track which blocker contributes to longest chain
 
-    // Mark one task per level for the sprint sequence (the one with max points)
-    // Only mark if there are multiple levels (otherwise all tasks are parallel)
+    // Process in level order to ensure blockers are processed first
+    const sortedByLevel = [...sprint].sort((a, b) => a.level - b.level);
+    for (const issue of sortedByLevel) {
+      const blockersInSprint = issue.blockedBy.filter((b) => sprintKeys.has(b));
+      if (blockersInSprint.length === 0) {
+        chainLength.set(issue.key, issue.points);
+        chainPrev.set(issue.key, null);
+      } else {
+        const blockerChains = blockersInSprint.map((b) => ({ key: b, len: chainLength.get(b) || 0 }));
+        const maxBlocker = blockerChains.reduce((a, b) => (a.len >= b.len ? a : b));
+        chainLength.set(issue.key, maxBlocker.len + issue.points);
+        chainPrev.set(issue.key, maxBlocker.key);
+      }
+    }
+
+    // Find longest chain and trace back to mark critical sequence
+    const seqPoints = Math.max(...chainLength.values());
     const sprintCritical = new Set();
-    if (byLevel.size > 1) {
-      const sortedLevels = [...byLevel.keys()].sort((a, b) => a - b);
-      for (const lvl of sortedLevels) {
-        const issues = byLevel.get(lvl);
-        const maxPts = Math.max(...issues.map((i) => i.points));
-        const maxIssue = issues.find((i) => i.points === maxPts);
-        sprintCritical.add(maxIssue.key);
+    if (sprint.length > 1) {
+      // Find end of longest chain
+      let current = [...chainLength.entries()].reduce((a, b) => (a[1] >= b[1] ? a : b))[0];
+      while (current) {
+        sprintCritical.add(current);
+        current = chainPrev.get(current);
       }
     }
 
@@ -49,25 +58,24 @@ export function displaySprints(sprints) {
     );
     console.log(chalk.cyan(line));
 
-    // Sort: sequence issues first (by level), then non-sequence (by rank)
+    // Sort: sequence issues first (by chain position), then non-sequence (by rank)
     const inSeq = (i) => sprintCritical.has(i.key);
     const bySeqFirst = (a, b) => (inSeq(a) === inSeq(b) ? 0 : inSeq(a) ? -1 : 1);
-    const byLevelAsc = (a, b) => a.level - b.level;
+    const byChainLength = (a, b) => (chainLength.get(a.key) || 0) - (chainLength.get(b.key) || 0);
     const byRank = (a, b) => (a.rank || '').localeCompare(b.rank || '');
-    const sortedSprint = [...sprint].sort((a, b) => bySeqFirst(a, b) || byLevelAsc(a, b) || byRank(a, b));
+    const sortedSprint = [...sprint].sort((a, b) => bySeqFirst(a, b) || byChainLength(a, b) || byRank(a, b));
 
-    // Build level info for box drawing - only connect different levels
+    // Find the last task in the sequence chain
     const seqTasks = sortedSprint.filter(inSeq);
-    const seqLevels = [...new Set(seqTasks.map((i) => i.level))].sort((a, b) => a - b);
-    const lastSeqLevel = seqLevels[seqLevels.length - 1];
+    const lastSeqKey = seqTasks.length > 0 ? seqTasks[seqTasks.length - 1].key : null;
 
     for (const issue of sortedSprint) {
       const isSprintCritical = inSeq(issue);
       const globalMarker = issue.critical ? chalk.red('★') : ' ';
 
       let sprintMarker = ' ';
-      if (isSprintCritical && seqLevels.length > 1) {
-        sprintMarker = issue.level === lastSeqLevel ? chalk.magenta('└') : chalk.magenta('│');
+      if (isSprintCritical && seqTasks.length > 1) {
+        sprintMarker = issue.key === lastSeqKey ? chalk.magenta('└') : chalk.magenta('│');
       }
 
       let keyPart = chalk.yellow(issue.key.padEnd(KEY_WIDTH));
@@ -84,7 +92,7 @@ export function displaySprints(sprints) {
       if (issue.blockedBy.length > 0) {
         const blockers = issue.blockedBy.map((k) => k.replace(/^[A-Z]+-/, '')).join(', ');
         const continueMarker =
-          isSprintCritical && seqLevels.length > 1 && issue.level !== lastSeqLevel ? chalk.magenta('│') : ' ';
+          isSprintCritical && seqTasks.length > 1 && issue.key !== lastSeqKey ? chalk.magenta('│') : ' ';
         console.log(`  ${continueMarker}` + chalk.gray(`${' '.repeat(KEY_WIDTH)}← blocked by ${blockers}`));
       }
 

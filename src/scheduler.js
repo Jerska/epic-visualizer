@@ -24,15 +24,20 @@ export function scheduleSprints(issues, maxPoints, maxSeq) {
     const sprint = [];
     const sprintSet = new Set();
     let sprintPoints = 0;
-    const maxPointsByLevel = new Map(); // Track max points per level for seq calculation
+    const chainLength = new Map(); // Track longest chain ending at each issue
 
-    // Calculate sequential points if we add an issue
+    // Calculate sequential points (longest chain) if we add an issue
     const getSeqPoints = (issue) => {
-      const currentMax = maxPointsByLevel.get(issue.level) || 0;
-      const newMax = Math.max(currentMax, issue.points);
-      const addedPoints = newMax - currentMax;
-      const currentSeqTotal = [...maxPointsByLevel.values()].reduce((sum, pts) => sum + pts, 0);
-      return currentSeqTotal + addedPoints;
+      // Find max chain length among blockers already in sprint
+      const blockerChains = issue.blockedBy
+        .filter((b) => sprintSet.has(b))
+        .map((b) => chainLength.get(b) || 0);
+      const maxBlockerChain = blockerChains.length > 0 ? Math.max(...blockerChains) : 0;
+      const issueChainLength = maxBlockerChain + issue.points;
+
+      // Current max chain in sprint
+      const currentMax = chainLength.size > 0 ? Math.max(...chainLength.values()) : 0;
+      return Math.max(currentMax, issueChainLength);
     };
 
     // Keep adding tasks until we can't add anymore (allows cascading within sprint)
@@ -58,8 +63,12 @@ export function scheduleSprints(issues, maxPoints, maxSeq) {
           sprint.push(issue);
           sprintSet.add(issue.key);
           sprintPoints += issue.points;
-          const currentMax = maxPointsByLevel.get(issue.level) || 0;
-          maxPointsByLevel.set(issue.level, Math.max(currentMax, issue.points));
+          // Update chain length for this issue
+          const blockerChains = issue.blockedBy
+            .filter((b) => sprintSet.has(b))
+            .map((b) => chainLength.get(b) || 0);
+          const maxBlockerChain = blockerChains.length > 0 ? Math.max(...blockerChains) : 0;
+          chainLength.set(issue.key, maxBlockerChain + issue.points);
           changed = true;
         }
       }
