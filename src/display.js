@@ -196,6 +196,7 @@ export function displaySprints(sprints, { verbose = false } = {}) {
 
   console.log();
   console.log(chalk.green.bold(`Total: ${sprints.length} sprints, ${totalPoints} points`));
+  console.log(chalk.gray(`Legend: `) + chalk.red('N') + chalk.gray(' = critical path step · ') + chalk.magenta('│└') + chalk.gray(' = sprint sequence'));
 
   // Display critical path grouped by level (only in verbose mode)
   if (verbose && criticalByLevel.size > 0) {
