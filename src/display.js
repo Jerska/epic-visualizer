@@ -24,7 +24,8 @@ export function displaySprints(sprints) {
       if (!byLevel.has(issue.level)) byLevel.set(issue.level, []);
       byLevel.get(issue.level).push(issue);
     }
-    const seqPoints = [...byLevel.values()].reduce((sum, issues) => sum + Math.max(...issues.map((i) => i.points)), 0);
+    const maxPointsPerLevel = [...byLevel.values()].map((issues) => Math.max(...issues.map((i) => i.points)));
+    const seqPoints = maxPointsPerLevel.reduce((sum, pts) => sum + pts, 0);
 
     // Mark one task per level for the sprint sequence (the one with max points)
     // Only mark if there are multiple levels (otherwise all tasks are parallel)
@@ -49,23 +50,19 @@ export function displaySprints(sprints) {
     console.log(chalk.cyan(line));
 
     // Sort: sequence issues first (by level), then non-sequence (by rank)
-    const sortedSprint = [...sprint].sort((a, b) => {
-      const aInSeq = sprintCritical.has(a.key);
-      const bInSeq = sprintCritical.has(b.key);
-      if (aInSeq && !bInSeq) return -1;
-      if (!aInSeq && bInSeq) return 1;
-      if (aInSeq && bInSeq) return a.level - b.level;
-      return (a.rank || '').localeCompare(b.rank || '');
-    });
+    const inSeq = (i) => sprintCritical.has(i.key);
+    const bySeqFirst = (a, b) => (inSeq(a) === inSeq(b) ? 0 : inSeq(a) ? -1 : 1);
+    const byLevelAsc = (a, b) => a.level - b.level;
+    const byRank = (a, b) => (a.rank || '').localeCompare(b.rank || '');
+    const sortedSprint = [...sprint].sort((a, b) => bySeqFirst(a, b) || byLevelAsc(a, b) || byRank(a, b));
 
     // Build level info for box drawing - only connect different levels
-    const seqTasks = sortedSprint.filter((i) => sprintCritical.has(i.key));
+    const seqTasks = sortedSprint.filter(inSeq);
     const seqLevels = [...new Set(seqTasks.map((i) => i.level))].sort((a, b) => a - b);
     const lastSeqLevel = seqLevels[seqLevels.length - 1];
 
-    for (let j = 0; j < sortedSprint.length; j++) {
-      const issue = sortedSprint[j];
-      const isSprintCritical = sprintCritical.has(issue.key);
+    for (const issue of sortedSprint) {
+      const isSprintCritical = inSeq(issue);
       const globalMarker = issue.critical ? chalk.red('★') : ' ';
 
       let sprintMarker = ' ';
@@ -106,10 +103,8 @@ export function displaySprints(sprints) {
   // Display critical path grouped by level
   if (criticalByLevel.size > 0) {
     const levels = [...criticalByLevel.keys()].sort((a, b) => a - b);
-    const minPoints = levels.reduce((sum, lvl) => {
-      const issues = criticalByLevel.get(lvl);
-      return sum + Math.max(...issues.map((i) => i.points));
-    }, 0);
+    const maxPointsPerLevel = levels.map((lvl) => Math.max(...criticalByLevel.get(lvl).map((i) => i.points)));
+    const minPoints = maxPointsPerLevel.reduce((sum, pts) => sum + pts, 0);
 
     console.log();
     console.log(chalk.red(`★ Critical path: ${levels.length} levels, ${minPoints} pts minimum`));

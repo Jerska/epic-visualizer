@@ -30,8 +30,9 @@ export function scheduleSprints(issues, maxPoints, maxSeq) {
     const getSeqPoints = (issue) => {
       const currentMax = maxPointsByLevel.get(issue.level) || 0;
       const newMax = Math.max(currentMax, issue.points);
-      const delta = newMax - currentMax;
-      return [...maxPointsByLevel.values()].reduce((sum, pts) => sum + pts, 0) + delta;
+      const addedPoints = newMax - currentMax;
+      const currentSeqTotal = [...maxPointsByLevel.values()].reduce((sum, pts) => sum + pts, 0);
+      return currentSeqTotal + addedPoints;
     };
 
     // Keep adding tasks until we can't add anymore (allows cascading within sprint)
@@ -40,19 +41,15 @@ export function scheduleSprints(issues, maxPoints, maxSeq) {
       changed = false;
 
       // Find issues whose blockers are all completed OR in current sprint
-      const available = issues.filter(
-        (i) =>
-          !completed.has(i.key) &&
-          !sprintSet.has(i.key) &&
-          i.blockedBy.every((b) => completed.has(b) || sprintSet.has(b))
-      );
+      const notYetScheduled = (i) => !completed.has(i.key) && !sprintSet.has(i.key);
+      const blockersResolved = (i) => i.blockedBy.every((b) => completed.has(b) || sprintSet.has(b));
+      const available = issues.filter((i) => notYetScheduled(i) && blockersResolved(i));
 
       // Sort by: critical first, then lower level (to enable cascading), then most blockers
-      available.sort((a, b) => {
-        if (a.critical !== b.critical) return a.critical ? -1 : 1;
-        if (a.level !== b.level) return a.level - b.level;
-        return blocks.get(b.key).length - blocks.get(a.key).length;
-      });
+      const byCriticalFirst = (a, b) => (a.critical === b.critical ? 0 : a.critical ? -1 : 1);
+      const byLevelAsc = (a, b) => a.level - b.level;
+      const byBlockersDesc = (a, b) => blocks.get(b.key).length - blocks.get(a.key).length;
+      available.sort((a, b) => byCriticalFirst(a, b) || byLevelAsc(a, b) || byBlockersDesc(a, b));
 
       for (const issue of available) {
         const fitsPoints = !maxPoints || sprintPoints + issue.points <= maxPoints;
