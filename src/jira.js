@@ -1,7 +1,8 @@
 import { Version3Client } from 'jira.js';
 
-const STORY_POINTS_FIELD = 'customfield_10033';
-const RANK_FIELD = 'customfield_10011';
+const STORY_POINTS_FIELD = process.env.JIRA_STORY_POINTS_FIELD || 'customfield_10033';
+const RANK_FIELD = process.env.JIRA_RANK_FIELD || 'customfield_10011';
+const EXCLUDE_STATUSES = process.env.JIRA_EXCLUDE_STATUSES || "Won't Do,Wontdo,WONTDO,Done,DONE";
 
 export async function fetchEpicIssues({ url, token, user, epicKey }) {
   const authentication = user
@@ -11,7 +12,8 @@ export async function fetchEpicIssues({ url, token, user, epicKey }) {
   const client = new Version3Client({ host: url, authentication });
 
   // Try both JQL syntaxes (team-managed vs company-managed)
-  const statusFilter = 'AND status NOT IN ("Won\'t Do", "Wontdo", "WONTDO", "Done", "DONE")';
+  const statuses = EXCLUDE_STATUSES.split(',').map((s) => `"${s.trim()}"`).join(', ');
+  const statusFilter = `AND status NOT IN (${statuses})`;
   let issues = await searchIssues(client, `parent = ${epicKey} ${statusFilter}`);
   if (issues.length === 0) {
     issues = await searchIssues(client, `"Epic Link" = ${epicKey} ${statusFilter}`);
