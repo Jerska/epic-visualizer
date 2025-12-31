@@ -32,7 +32,8 @@ epic-visualizer -e https://your-jira.atlassian.net/browse/PROJ-123
 | `JIRA_USER` | JIRA account email (required for Cloud) |
 | `JIRA_STORY_POINTS_FIELD` | Custom field ID for story points (default: `customfield_10033`) |
 | `JIRA_RANK_FIELD` | Custom field ID for rank (default: `customfield_10011`) |
-| `JIRA_EXCLUDE_STATUSES` | Comma-separated statuses to exclude (default: `Won't Do,Wontdo,WONTDO,Done,DONE`) |
+| `JIRA_EXCLUDE_STATUSES` | Comma-separated statuses to exclude (default: `Won't Do,Wontdo,WONTDO`) |
+| `JIRA_DONE_STATUSES` | Comma-separated statuses considered "done" (default: `Done,DONE`) |
 
 ## Output
 

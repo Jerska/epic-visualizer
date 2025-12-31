@@ -7,6 +7,95 @@ const POINTS_WIDTH = 6;
 const PADDING = 4; // 2 spaces indent + 2 spaces between parts
 const SUMMARY_WIDTH = WIDTH - MARKER_WIDTH - KEY_WIDTH - POINTS_WIDTH - PADDING;
 
+export function displayCompleted(done) {
+  if (done.length === 0) return;
+
+  const line = '━'.repeat(WIDTH);
+  const points = done.reduce((sum, issue) => sum + issue.points, 0);
+
+  // Calculate chain lengths based on actual dependencies within completed tasks
+  const doneKeys = new Set(done.map((i) => i.key));
+  const chainLength = new Map();
+  const chainPrev = new Map();
+
+  // Compute levels for done tasks (dependency depth)
+  const level = new Map();
+  const calcLevel = (key) => {
+    if (level.has(key)) return level.get(key);
+    const issue = done.find((i) => i.key === key);
+    if (!issue) return 0;
+    const blockersInDone = issue.blockedBy.filter((b) => doneKeys.has(b));
+    if (blockersInDone.length === 0) {
+      level.set(key, 1);
+      return 1;
+    }
+    const maxBlockerLevel = Math.max(...blockersInDone.map(calcLevel));
+    level.set(key, maxBlockerLevel + 1);
+    return maxBlockerLevel + 1;
+  };
+  for (const issue of done) calcLevel(issue.key);
+
+  // Process in level order to ensure blockers are processed first
+  const sortedByLevel = [...done].sort((a, b) => (level.get(a.key) || 0) - (level.get(b.key) || 0));
+  for (const issue of sortedByLevel) {
+    const blockersInDone = issue.blockedBy.filter((b) => doneKeys.has(b));
+    if (blockersInDone.length === 0) {
+      chainLength.set(issue.key, issue.points);
+      chainPrev.set(issue.key, null);
+    } else {
+      const blockerChains = blockersInDone.map((b) => ({ key: b, len: chainLength.get(b) || 0 }));
+      const maxBlocker = blockerChains.reduce((a, b) => (a.len >= b.len ? a : b));
+      chainLength.set(issue.key, maxBlocker.len + issue.points);
+      chainPrev.set(issue.key, maxBlocker.key);
+    }
+  }
+
+  // Find longest chain
+  const seqPoints = chainLength.size > 0 ? Math.max(...chainLength.values()) : points;
+  const completedCritical = new Set();
+  if (done.length > 1 && chainLength.size > 0) {
+    let current = [...chainLength.entries()].reduce((a, b) => (a[1] >= b[1] ? a : b))[0];
+    while (current) {
+      completedCritical.add(current);
+      current = chainPrev.get(current);
+    }
+  }
+
+  console.log();
+  console.log(chalk.green(line));
+  const ptsDisplay = seqPoints < points ? `seq ${seqPoints} · total ${points} pts` : `${points} pts`;
+  console.log(
+    chalk.green.bold(` Completed`) +
+      chalk.gray(`${' '.repeat(Math.max(1, WIDTH - 14 - ptsDisplay.length))}${ptsDisplay}`)
+  );
+  console.log(chalk.green(line));
+
+  // Sort by chain position
+  const inSeq = (i) => completedCritical.has(i.key);
+  const bySeqFirst = (a, b) => (inSeq(a) === inSeq(b) ? 0 : inSeq(a) ? -1 : 1);
+  const byChainLength = (a, b) => (chainLength.get(a.key) || 0) - (chainLength.get(b.key) || 0);
+  const byRank = (a, b) => (a.rank || '').localeCompare(b.rank || '');
+  const sorted = [...done].sort((a, b) => bySeqFirst(a, b) || byChainLength(a, b) || byRank(a, b));
+
+  const seqTasks = sorted.filter(inSeq);
+  const lastSeqKey = seqTasks.length > 0 ? seqTasks[seqTasks.length - 1].key : null;
+
+  for (const issue of sorted) {
+    const isSeqCritical = inSeq(issue);
+    const marker = chalk.green('✓');
+
+    let seqMarker = ' ';
+    if (isSeqCritical && seqTasks.length > 1) {
+      seqMarker = issue.key === lastSeqKey ? chalk.gray('└') : chalk.gray('│');
+    }
+
+    const keyPart = chalk.gray(issue.key.padEnd(KEY_WIDTH));
+    const summaryPart = chalk.gray(truncate(issue.summary, SUMMARY_WIDTH));
+    const pointsPart = chalk.gray(`${issue.points}pts`.padStart(POINTS_WIDTH));
+    console.log(` ${marker}${seqMarker} ${keyPart}${summaryPart} ${pointsPart}`);
+  }
+}
+
 export function displaySprints(sprints) {
   const line = '━'.repeat(WIDTH);
   let totalPoints = 0;

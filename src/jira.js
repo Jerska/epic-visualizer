@@ -2,7 +2,8 @@ import { Version3Client } from 'jira.js';
 
 const STORY_POINTS_FIELD = process.env.JIRA_STORY_POINTS_FIELD || 'customfield_10033';
 const RANK_FIELD = process.env.JIRA_RANK_FIELD || 'customfield_10011';
-const EXCLUDE_STATUSES = process.env.JIRA_EXCLUDE_STATUSES || "Won't Do,Wontdo,WONTDO,Done,DONE";
+const EXCLUDE_STATUSES = process.env.JIRA_EXCLUDE_STATUSES || "Won't Do,Wontdo,WONTDO";
+const DONE_STATUSES = process.env.JIRA_DONE_STATUSES || 'Done,DONE';
 
 export async function fetchEpicIssues({ url, token, user, epicKey }) {
   const authentication = user
@@ -12,14 +13,21 @@ export async function fetchEpicIssues({ url, token, user, epicKey }) {
   const client = new Version3Client({ host: url, authentication });
 
   // Try both JQL syntaxes (team-managed vs company-managed)
-  const statuses = EXCLUDE_STATUSES.split(',').map((s) => `"${s.trim()}"`).join(', ');
-  const statusFilter = `AND status NOT IN (${statuses})`;
+  const excludeList = EXCLUDE_STATUSES.split(',').map((s) => `"${s.trim()}"`).join(', ');
+  const statusFilter = `AND status NOT IN (${excludeList})`;
   let issues = await searchIssues(client, `parent = ${epicKey} ${statusFilter}`);
   if (issues.length === 0) {
     issues = await searchIssues(client, `"Epic Link" = ${epicKey} ${statusFilter}`);
   }
 
-  return issues.map(normalizeIssue);
+  const normalized = issues.map(normalizeIssue);
+  const doneList = DONE_STATUSES.split(',').map((s) => s.trim().toLowerCase());
+  const isDone = (issue) => doneList.includes((issue.status || '').toLowerCase());
+
+  return {
+    done: normalized.filter(isDone),
+    pending: normalized.filter((i) => !isDone(i)),
+  };
 }
 
 async function searchIssues(client, jql) {

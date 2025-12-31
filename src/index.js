@@ -3,7 +3,7 @@
 import { program } from 'commander';
 import { fetchEpicIssues } from './jira.js';
 import { scheduleSprints } from './scheduler.js';
-import { displaySprints } from './display.js';
+import { displayCompleted, displaySprints } from './display.js';
 
 program
   .name('epic-visualizer')
@@ -46,15 +46,21 @@ const jiraUrl = urlMatch[1];
 const epicKey = urlMatch[2];
 
 try {
-  const issues = await fetchEpicIssues({ url: jiraUrl, token, user, epicKey });
+  const { done, pending } = await fetchEpicIssues({ url: jiraUrl, token, user, epicKey });
 
-  if (issues.length === 0) {
+  if (done.length === 0 && pending.length === 0) {
     console.log('No issues found in epic.');
     process.exit(0);
   }
 
-  const sprints = scheduleSprints(issues, opts.points, opts.seq);
-  displaySprints(sprints);
+  if (done.length > 0) {
+    displayCompleted(done);
+  }
+
+  if (pending.length > 0) {
+    const sprints = scheduleSprints(pending, opts.points, opts.seq);
+    displaySprints(sprints);
+  }
 } catch (err) {
   console.error('Error:', err.message);
   process.exit(1);
