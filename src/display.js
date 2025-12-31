@@ -102,10 +102,26 @@ export function displayCompleted(done) {
   }
 }
 
-export function displaySprints(sprints, { verbose = false } = {}) {
+export function displaySprints(sprints, { verbose = false, startDate, sprintWeeks } = {}) {
   const line = '━'.repeat(WIDTH);
   let totalPoints = 0;
   const criticalByLevel = new Map();
+
+  const baseYear = startDate ? new Date(startDate).getFullYear() : null;
+  const fmtDate = (d) => {
+    const opts = { month: 'short', day: 'numeric' };
+    if (d.getFullYear() !== baseYear) opts.year = 'numeric';
+    return d.toLocaleDateString('en-US', opts);
+  };
+
+  const getSprintDates = (sprintIndex) => {
+    if (!startDate || !sprintWeeks) return null;
+    const start = new Date(startDate);
+    start.setDate(start.getDate() + sprintIndex * sprintWeeks * 7);
+    const end = new Date(start);
+    end.setDate(end.getDate() + sprintWeeks * 7 - 1);
+    return `${fmtDate(start)} – ${fmtDate(end)}`;
+  };
 
   for (let i = 0; i < sprints.length; i++) {
     const sprint = sprints[i];
@@ -145,13 +161,18 @@ export function displaySprints(sprints, { verbose = false } = {}) {
     }
 
     console.log();
+    const dates = getSprintDates(i);
+    const datesRaw = dates ? ` (${dates})` : '';
+    const datesDisplay = dates ? chalk.gray(` (${dates})`) : '';
     const ptsDisplayRaw = seqPoints < points ? `seq ${seqPoints} pts · total ${points} pts` : `${points} pts`;
     const ptsDisplay = seqPoints < points
       ? chalk.gray('seq ') + formatPts(seqPoints) + chalk.gray(' · total ') + formatPts(points)
       : formatPts(points);
+    const sprintLabel = ` Sprint ${i + 1}`;
+    const headerLen = sprintLabel.length + datesRaw.length + ptsDisplayRaw.length;
     console.log(
-      chalk.cyan.bold(` Sprint ${i + 1}`) +
-        ' '.repeat(Math.max(1, WIDTH - 12 - ptsDisplayRaw.length)) + ptsDisplay
+      chalk.cyan.bold(sprintLabel) + datesDisplay +
+        ' '.repeat(Math.max(1, WIDTH - headerLen)) + ptsDisplay
     );
     console.log(chalk.cyan(line));
 
@@ -211,7 +232,13 @@ export function displaySprints(sprints, { verbose = false } = {}) {
   }
 
   console.log();
-  console.log(chalk.green.bold('Total: ') + chalk.white(sprints.length) + chalk.green.bold(' sprints, ') + chalk.white(totalPoints) + chalk.green.bold(' points'));
+  let endDateDisplay = '';
+  if (startDate && sprintWeeks) {
+    const end = new Date(startDate);
+    end.setDate(end.getDate() + sprints.length * sprintWeeks * 7 - 1);
+    endDateDisplay = chalk.green.bold(', ends ') + chalk.white(fmtDate(end));
+  }
+  console.log(chalk.green.bold('Total: ') + chalk.white(sprints.length) + chalk.green.bold(' sprints, ') + chalk.white(totalPoints) + chalk.green.bold(' points') + endDateDisplay);
   console.log(chalk.gray(`Legend: `) + chalk.red('N') + chalk.gray(' = critical path step · ') + chalk.magenta('·│└') + chalk.gray(' = sprint sequence'));
 
   // Display critical path grouped by level (only in verbose mode)

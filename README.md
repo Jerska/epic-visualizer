@@ -24,6 +24,8 @@ epic-visualizer -e https://your-jira.atlassian.net/browse/PROJ-123
 | `-p, --points <n>` | Maximum total points per sprint |
 | `-s, --seq <n>` | Maximum sequential points per sprint |
 | `-v, --verbose` | Show critical path details |
+| `-d, --start <date>` | Sprint start date (YYYY-MM-DD) |
+| `-w, --weeks <n>` | Sprint duration in weeks |
 
 ## Environment Variables
 

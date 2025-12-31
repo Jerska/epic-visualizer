@@ -14,6 +14,8 @@ program
   .option('-p, --points <number>', 'Maximum story points per sprint', parseFloat)
   .option('-s, --seq <number>', 'Maximum sequential points per sprint', parseFloat)
   .option('-v, --verbose', 'Show critical path details')
+  .option('-d, --start <date>', 'Sprint start date (YYYY-MM-DD)')
+  .option('-w, --weeks <number>', 'Sprint duration in weeks', parseFloat)
   .parse();
 
 const opts = program.opts();
@@ -34,6 +36,16 @@ if (opts.points !== undefined && (isNaN(opts.points) || opts.points <= 0)) {
 
 if (opts.seq !== undefined && (isNaN(opts.seq) || opts.seq <= 0)) {
   console.error('Error: -s/--seq must be a positive number.');
+  process.exit(1);
+}
+
+if (opts.start !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(opts.start)) {
+  console.error('Error: -d/--start must be a valid date (YYYY-MM-DD).');
+  process.exit(1);
+}
+
+if (opts.weeks !== undefined && (isNaN(opts.weeks) || opts.weeks <= 0)) {
+  console.error('Error: -w/--weeks must be a positive number.');
   process.exit(1);
 }
 
@@ -60,7 +72,11 @@ try {
 
   if (pending.length > 0) {
     const sprints = scheduleSprints(pending, opts.points, opts.seq);
-    displaySprints(sprints, { verbose: opts.verbose });
+    displaySprints(sprints, {
+      verbose: opts.verbose,
+      startDate: opts.start,
+      sprintWeeks: opts.weeks,
+    });
   }
 } catch (err) {
   console.error('Error:', err.message);
