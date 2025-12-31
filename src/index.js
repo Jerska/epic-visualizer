@@ -2,7 +2,7 @@
 
 import { program } from 'commander';
 import { fetchEpicIssues } from './jira.js';
-import { schedulesprints } from './scheduler.js';
+import { scheduleSprints } from './scheduler.js';
 import { displaySprints } from './display.js';
 
 program
@@ -43,7 +43,7 @@ try {
     process.exit(0);
   }
 
-  const sprints = schedulesprints(issues, opts.points, opts.seq);
+  const sprints = scheduleSprints(issues, opts.points, opts.seq);
   displaySprints(sprints);
 } catch (err) {
   console.error('Error:', err.message);

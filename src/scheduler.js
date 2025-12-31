@@ -1,4 +1,4 @@
-export function schedulesprints(issues, maxPoints, maxSeq) {
+export function scheduleSprints(issues, maxPoints, maxSeq) {
   const issueMap = new Map(issues.map((i) => [i.key, i]));
 
   // Filter blockedBy to only include issues within the epic
