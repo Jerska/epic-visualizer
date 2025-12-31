@@ -22,7 +22,17 @@ const token = opts.token || process.env.JIRA_TOKEN;
 const user = opts.user || process.env.JIRA_USER;
 
 if (!token) {
-  console.error('Error: JIRA token required. Use --token or set JIRA_TOKEN env var.');
+  console.error('Error: JIRA token required. Use -t/--token or set JIRA_TOKEN env var.');
+  process.exit(1);
+}
+
+if (opts.points !== undefined && (isNaN(opts.points) || opts.points <= 0)) {
+  console.error('Error: -p/--points must be a positive number.');
+  process.exit(1);
+}
+
+if (opts.seq !== undefined && (isNaN(opts.seq) || opts.seq <= 0)) {
+  console.error('Error: -s/--seq must be a positive number.');
   process.exit(1);
 }
 
