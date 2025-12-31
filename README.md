@@ -23,6 +23,7 @@ epic-visualizer -e https://your-jira.atlassian.net/browse/PROJ-123
 | `-u, --user <email>` | JIRA account email for Cloud (or `JIRA_USER` env var) |
 | `-p, --points <n>` | Maximum total points per sprint |
 | `-s, --seq <n>` | Maximum sequential points per sprint |
+| `-v, --verbose` | Show critical path details |
 
 ## Environment Variables
 

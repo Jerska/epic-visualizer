@@ -13,6 +13,7 @@ program
   .option('-u, --user <email>', 'JIRA account email (for Cloud, or set JIRA_USER env var)')
   .option('-p, --points <number>', 'Maximum story points per sprint', parseFloat)
   .option('-s, --seq <number>', 'Maximum sequential points per sprint', parseFloat)
+  .option('-v, --verbose', 'Show critical path details')
   .parse();
 
 const opts = program.opts();
@@ -59,7 +60,7 @@ try {
 
   if (pending.length > 0) {
     const sprints = scheduleSprints(pending, opts.points, opts.seq);
-    displaySprints(sprints);
+    displaySprints(sprints, { verbose: opts.verbose });
   }
 } catch (err) {
   console.error('Error:', err.message);

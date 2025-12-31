@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 
 const WIDTH = Math.min(process.stdout.columns || 100, 120);
-const MARKER_WIDTH = 3; // globalMarker + sprintMarker + space
+const MARKER_WIDTH = 5; // globalMarker (3) + sprintMarker + space
 const KEY_WIDTH = 12;
 const POINTS_WIDTH = 6;
 const PADDING = 4; // 2 spaces indent + 2 spaces between parts
@@ -96,7 +96,7 @@ export function displayCompleted(done) {
   }
 }
 
-export function displaySprints(sprints) {
+export function displaySprints(sprints, { verbose = false } = {}) {
   const line = '━'.repeat(WIDTH);
   let totalPoints = 0;
   const criticalByLevel = new Map();
@@ -160,7 +160,7 @@ export function displaySprints(sprints) {
 
     for (const issue of sortedSprint) {
       const isSprintCritical = inSeq(issue);
-      const globalMarker = issue.critical ? chalk.red('★') : ' ';
+      const globalMarker = issue.critical ? chalk.red(String(issue.level).padStart(2)) + ' ' : '   ';
 
       let sprintMarker = ' ';
       if (isSprintCritical && seqTasks.length > 1) {
@@ -182,7 +182,7 @@ export function displaySprints(sprints) {
         const blockers = issue.blockedBy.map((k) => k.replace(/^[A-Z]+-/, '')).join(', ');
         const continueMarker =
           isSprintCritical && seqTasks.length > 1 && issue.key !== lastSeqKey ? chalk.magenta('│') : ' ';
-        console.log(`  ${continueMarker}` + chalk.gray(`${' '.repeat(KEY_WIDTH)}← blocked by ${blockers}`));
+        console.log(`    ${continueMarker}` + chalk.gray(`${' '.repeat(KEY_WIDTH)}← blocked by ${blockers}`));
       }
 
       if (issue.critical) {
@@ -197,14 +197,14 @@ export function displaySprints(sprints) {
   console.log();
   console.log(chalk.green.bold(`Total: ${sprints.length} sprints, ${totalPoints} points`));
 
-  // Display critical path grouped by level
-  if (criticalByLevel.size > 0) {
+  // Display critical path grouped by level (only in verbose mode)
+  if (verbose && criticalByLevel.size > 0) {
     const levels = [...criticalByLevel.keys()].sort((a, b) => a - b);
     const maxPointsPerLevel = levels.map((lvl) => Math.max(...criticalByLevel.get(lvl).map((i) => i.points)));
     const minPoints = maxPointsPerLevel.reduce((sum, pts) => sum + pts, 0);
 
     console.log();
-    console.log(chalk.red(`★ Critical path: ${levels.length} levels, ${minPoints} pts minimum`));
+    console.log(chalk.red(`Critical path: ${levels.length} levels, ${minPoints} pts minimum`));
 
     const maxLevelWidth = String(levels.length).length;
     const maxPtsWidth = Math.max(...levels.map((lvl) => {
