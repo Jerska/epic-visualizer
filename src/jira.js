@@ -3,9 +3,9 @@ import { Version3Client } from 'jira.js';
 const STORY_POINTS_FIELD = 'customfield_10033';
 const RANK_FIELD = 'customfield_10011';
 
-export async function fetchEpicIssues({ url, token, email, epicKey }) {
-  const authentication = email
-    ? { basic: { email, apiToken: token } } // Jira Cloud
+export async function fetchEpicIssues({ url, token, user, epicKey }) {
+  const authentication = user
+    ? { basic: { email: user, apiToken: token } } // Jira Cloud
     : { personalAccessToken: token }; // Jira Server/Data Center
 
   const client = new Version3Client({ host: url, authentication });

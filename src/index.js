@@ -8,19 +8,18 @@ import { displaySprints } from './display.js';
 program
   .name('epic-visualizer')
   .description('Display optimal sprint sequence for a JIRA epic')
-  .requiredOption('-e, --epic <key>', 'Epic key (e.g., PROJ-123) or full JIRA URL')
+  .requiredOption('-e, --epic <url>', 'Epic URL (e.g., https://your-org.atlassian.net/browse/PROJ-123)')
   .option('-t, --token <token>', 'JIRA API token (or set JIRA_TOKEN env var)')
-  .option('--email <email>', 'JIRA account email (for Cloud, or set JIRA_EMAIL env var)')
-  .option('-u, --url <url>', 'JIRA instance URL (extracted from epic URL if provided)')
-  .option('-m, --max-points <number>', 'Maximum story points per sprint', parseFloat)
-  .option('-s, --max-seq <number>', 'Maximum sequential points per sprint', parseFloat)
+  .option('-u, --user <email>', 'JIRA account email (for Cloud, or set JIRA_USER env var)')
+  .option('-p, --points <number>', 'Maximum story points per sprint', parseFloat)
+  .option('-s, --seq <number>', 'Maximum sequential points per sprint', parseFloat)
   .parse();
 
 const opts = program.opts();
 
-// Get token and email from options or environment
+// Get token and user from options or environment
 const token = opts.token || process.env.JIRA_TOKEN;
-const email = opts.email || process.env.JIRA_EMAIL;
+const user = opts.user || process.env.JIRA_USER;
 
 if (!token) {
   console.error('Error: JIRA token required. Use --token or set JIRA_TOKEN env var.');
@@ -28,31 +27,24 @@ if (!token) {
 }
 
 // Parse epic key and URL from input
-let epicKey = opts.epic;
-let jiraUrl = opts.url;
-
-// Handle full JIRA URLs
-const urlMatch = epicKey.match(/^(https?:\/\/[^/]+)\/.*\/([A-Z]+-\d+)/);
-if (urlMatch) {
-  jiraUrl = jiraUrl || urlMatch[1];
-  epicKey = urlMatch[2];
-}
-
-if (!jiraUrl) {
-  console.error('Error: JIRA URL required. Use --url or provide a full epic URL.');
+const urlMatch = opts.epic.match(/^(https?:\/\/[^/]+)\/.*\/([A-Z]+-\d+)/);
+if (!urlMatch) {
+  console.error('Error: Invalid epic URL. Expected format: https://your-org.atlassian.net/browse/PROJ-123');
   process.exit(1);
 }
+const jiraUrl = urlMatch[1];
+const epicKey = urlMatch[2];
 
 async function main() {
   try {
-    const issues = await fetchEpicIssues({ url: jiraUrl, token, email, epicKey });
+    const issues = await fetchEpicIssues({ url: jiraUrl, token, user, epicKey });
 
     if (issues.length === 0) {
       console.log('No issues found in epic.');
       return;
     }
 
-    const sprints = schedulesprints(issues, opts.maxPoints, opts.maxSeq);
+    const sprints = schedulesprints(issues, opts.points, opts.seq);
     displaySprints(sprints);
   } catch (err) {
     console.error('Error:', err.message);
