@@ -11,7 +11,7 @@ npm install
 ## Usage
 
 ```bash
-epic-visualizer -e https://your-jira.atlassian.net/browse/PROJ-123
+node src/index.js --epic https://your-jira.atlassian.net/browse/PROJ-123 --seq 20 --points 40 --start 2026-01-01 --weeks 1
 ```
 
 ## Options

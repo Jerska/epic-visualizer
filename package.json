@@ -4,12 +4,6 @@
   "description": "Display optimal sprint sequence for a JIRA epic respecting dependencies",
   "type": "module",
   "main": "src/index.js",
-  "bin": {
-    "epic-visualizer": "./src/index.js"
-  },
-  "scripts": {
-    "start": "node src/index.js"
-  },
   "keywords": [
     "jira",
     "epic",
