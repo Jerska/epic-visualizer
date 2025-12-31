@@ -6,15 +6,16 @@ export function schedulesprints(issues, maxPoints) {
     issue.blockedBy = issue.blockedBy.filter((key) => issueMap.has(key));
   }
 
-  // Count how many issues each issue blocks (for prioritization)
-  const blocksCount = new Map(issues.map((i) => [i.key, 0]));
+  // Build reverse dependency map (who does this issue block?)
+  const blocks = new Map(issues.map((i) => [i.key, []]));
   for (const issue of issues) {
     for (const blocker of issue.blockedBy) {
-      blocksCount.set(blocker, blocksCount.get(blocker) + 1);
+      blocks.get(blocker).push(issue.key);
     }
   }
 
   detectCycles(issues);
+  markCriticalPath(issues, issueMap, blocks);
 
   const sprints = [];
   const completed = new Set();
@@ -29,8 +30,11 @@ export function schedulesprints(issues, maxPoints) {
       throw new Error('Deadlock detected: no available issues but not all completed');
     }
 
-    // Sort by: most blockers first (to unblock more work)
-    available.sort((a, b) => blocksCount.get(b.key) - blocksCount.get(a.key));
+    // Sort by: critical path first, then most blockers
+    available.sort((a, b) => {
+      if (a.critical !== b.critical) return a.critical ? -1 : 1;
+      return blocks.get(b.key).length - blocks.get(a.key).length;
+    });
 
     const sprint = [];
     let sprintPoints = 0;
@@ -54,6 +58,61 @@ export function schedulesprints(issues, maxPoints) {
   }
 
   return sprints;
+}
+
+function markCriticalPath(issues, issueMap, blocks) {
+  // Compute level = earliest possible sprint (dependency depth)
+  const level = new Map();
+
+  function calcLevel(key) {
+    if (level.has(key)) return level.get(key);
+
+    const issue = issueMap.get(key);
+    if (issue.blockedBy.length === 0) {
+      level.set(key, 1);
+      return 1;
+    }
+
+    const maxBlockerLevel = Math.max(...issue.blockedBy.map(calcLevel));
+    const l = maxBlockerLevel + 1;
+    level.set(key, l);
+    return l;
+  }
+
+  for (const issue of issues) {
+    calcLevel(issue.key);
+  }
+
+  // Max level = minimum possible sprints (ignoring capacity)
+  const maxLevel = Math.max(...level.values());
+
+  // Trace back from max-level tasks to find all tasks on critical paths
+  const critical = new Set();
+
+  function traceCritical(key) {
+    if (critical.has(key)) return;
+    critical.add(key);
+
+    const issue = issueMap.get(key);
+    // Follow blockers that are exactly one level back (on the critical chain)
+    for (const blocker of issue.blockedBy) {
+      if (level.get(blocker) === level.get(key) - 1) {
+        traceCritical(blocker);
+      }
+    }
+  }
+
+  // Start from all tasks at max level
+  for (const issue of issues) {
+    if (level.get(issue.key) === maxLevel) {
+      traceCritical(issue.key);
+    }
+  }
+
+  for (const issue of issues) {
+    issue.critical = critical.has(issue.key);
+    issue.level = level.get(issue.key);
+  }
 }
 
 function detectCycles(issues) {
