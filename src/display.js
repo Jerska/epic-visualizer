@@ -1,9 +1,9 @@
 import chalk from 'chalk';
 
-const WIDTH = Math.min(process.stdout.columns || 100, 120);
+const WIDTH = process.stdout.columns || 100;
 const MARKER_WIDTH = 5; // globalMarker (3) + sprintMarker + space
 const KEY_WIDTH = 12;
-const POINTS_WIDTH = 6;
+const POINTS_WIDTH = 7;
 const PADDING = 4; // 2 spaces indent + 2 spaces between parts
 const SUMMARY_WIDTH = WIDTH - MARKER_WIDTH - KEY_WIDTH - POINTS_WIDTH - PADDING;
 
@@ -62,11 +62,13 @@ export function displayCompleted(done) {
   }
 
   console.log();
-  console.log(chalk.green(line));
-  const ptsDisplay = seqPoints < points ? `seq ${seqPoints} · total ${points} pts` : `${points} pts`;
+  const ptsDisplayRaw = seqPoints < points ? `seq ${seqPoints} pts · total ${points} pts` : `${points} pts`;
+  const ptsDisplay = seqPoints < points
+    ? chalk.gray('seq ') + formatPts(seqPoints) + chalk.gray(' · total ') + formatPts(points)
+    : formatPts(points);
   console.log(
     chalk.green.bold(` Completed`) +
-      chalk.gray(`${' '.repeat(Math.max(1, WIDTH - 14 - ptsDisplay.length))}${ptsDisplay}`)
+      ' '.repeat(Math.max(1, WIDTH - 14 - ptsDisplayRaw.length)) + ptsDisplay
   );
   console.log(chalk.green(line));
 
@@ -82,7 +84,7 @@ export function displayCompleted(done) {
 
   for (const issue of sorted) {
     const isSeqCritical = inSeq(issue);
-    const marker = chalk.green('✓');
+    const marker = chalk.green(' ✓ '); // 3 chars like globalMarker
 
     let seqMarker = ' ';
     if (isSeqCritical && seqTasks.length > 1) {
@@ -90,9 +92,13 @@ export function displayCompleted(done) {
     }
 
     const keyPart = chalk.gray(issue.key.padEnd(KEY_WIDTH));
-    const summaryPart = chalk.gray(truncate(issue.summary, SUMMARY_WIDTH));
-    const pointsPart = chalk.gray(`${issue.points}pts`.padStart(POINTS_WIDTH));
-    console.log(` ${marker}${seqMarker} ${keyPart}${summaryPart} ${pointsPart}`);
+
+    const blockersRaw = formatBlockers(issue.blockedBy, SUMMARY_WIDTH);
+    const blockersPart = blockersRaw ? chalk.gray(blockersRaw) : '';
+    const summaryPart = chalk.gray(truncate(issue.summary, SUMMARY_WIDTH - blockersRaw.length));
+
+    const pointsPart = chalk.white(String(issue.points).padStart(POINTS_WIDTH - 4)) + chalk.gray(' pts');
+    console.log(` ${marker}${seqMarker} ${keyPart}${summaryPart}${blockersPart} ${pointsPart}`);
   }
 }
 
@@ -139,11 +145,13 @@ export function displaySprints(sprints, { verbose = false } = {}) {
     }
 
     console.log();
-    console.log(chalk.cyan(line));
-    const ptsDisplay = seqPoints < points ? `seq ${seqPoints} · total ${points} pts` : `${points} pts`;
+    const ptsDisplayRaw = seqPoints < points ? `seq ${seqPoints} pts · total ${points} pts` : `${points} pts`;
+    const ptsDisplay = seqPoints < points
+      ? chalk.gray('seq ') + formatPts(seqPoints) + chalk.gray(' · total ') + formatPts(points)
+      : formatPts(points);
     console.log(
       chalk.cyan.bold(` Sprint ${i + 1}`) +
-        chalk.gray(`${' '.repeat(Math.max(1, WIDTH - 12 - ptsDisplay.length))}${ptsDisplay}`)
+        ' '.repeat(Math.max(1, WIDTH - 12 - ptsDisplayRaw.length)) + ptsDisplay
     );
     console.log(chalk.cyan(line));
 
@@ -160,7 +168,12 @@ export function displaySprints(sprints, { verbose = false } = {}) {
 
     for (const issue of sortedSprint) {
       const isSprintCritical = inSeq(issue);
-      const globalMarker = issue.critical ? chalk.red(String(issue.level).padStart(2)) + ' ' : '   ';
+      let globalMarker = '   ';
+      if (issue.critical) {
+        globalMarker = chalk.red(String(issue.level).padStart(2)) + ' ';
+      } else if (isSprintCritical) {
+        globalMarker = chalk.magenta(' · ');
+      }
 
       let sprintMarker = ' ';
       if (isSprintCritical && seqTasks.length > 1) {
@@ -174,16 +187,13 @@ export function displaySprints(sprints, { verbose = false } = {}) {
         keyPart = chalk.magenta(issue.key.padEnd(KEY_WIDTH));
       }
 
-      const summaryPart = truncate(issue.summary, SUMMARY_WIDTH);
-      const pointsPart = chalk.gray(`${issue.points}pts`.padStart(POINTS_WIDTH));
-      console.log(` ${globalMarker}${sprintMarker} ${keyPart}${summaryPart} ${pointsPart}`);
+      // Format blockers inline, showing as many as fit
+      const blockersRaw = formatBlockers(issue.blockedBy, SUMMARY_WIDTH);
+      const blockersPart = blockersRaw ? chalk.gray(blockersRaw) : '';
 
-      if (issue.blockedBy.length > 0) {
-        const blockers = issue.blockedBy.map((k) => k.replace(/^[A-Z]+-/, '')).join(', ');
-        const continueMarker =
-          isSprintCritical && seqTasks.length > 1 && issue.key !== lastSeqKey ? chalk.magenta('│') : ' ';
-        console.log(`    ${continueMarker}` + chalk.gray(`${' '.repeat(KEY_WIDTH)}← blocked by ${blockers}`));
-      }
+      const summaryPart = truncate(issue.summary, SUMMARY_WIDTH - blockersRaw.length);
+      const pointsPart = chalk.white(String(issue.points).padStart(POINTS_WIDTH - 4)) + chalk.gray(' pts');
+      console.log(` ${globalMarker}${sprintMarker} ${keyPart}${summaryPart}${blockersPart} ${pointsPart}`);
 
       if (issue.critical) {
         if (!criticalByLevel.has(issue.level)) {
@@ -191,12 +201,18 @@ export function displaySprints(sprints, { verbose = false } = {}) {
         }
         criticalByLevel.get(issue.level).push(issue);
       }
+
+      // Add blank line after sequence tasks, before non-sequence tasks (only if there's a real sequence)
+      const hasNonSeqTasks = sortedSprint.some((i) => !inSeq(i));
+      if (issue.key === lastSeqKey && hasNonSeqTasks && seqTasks.length > 1) {
+        console.log();
+      }
     }
   }
 
   console.log();
-  console.log(chalk.green.bold(`Total: ${sprints.length} sprints, ${totalPoints} points`));
-  console.log(chalk.gray(`Legend: `) + chalk.red('N') + chalk.gray(' = critical path step · ') + chalk.magenta('│└') + chalk.gray(' = sprint sequence'));
+  console.log(chalk.green.bold('Total: ') + chalk.white(sprints.length) + chalk.green.bold(' sprints, ') + chalk.white(totalPoints) + chalk.green.bold(' points'));
+  console.log(chalk.gray(`Legend: `) + chalk.red('N') + chalk.gray(' = critical path step · ') + chalk.magenta('·│└') + chalk.gray(' = sprint sequence'));
 
   // Display critical path grouped by level (only in verbose mode)
   if (verbose && criticalByLevel.size > 0) {
@@ -205,7 +221,7 @@ export function displaySprints(sprints, { verbose = false } = {}) {
     const minPoints = maxPointsPerLevel.reduce((sum, pts) => sum + pts, 0);
 
     console.log();
-    console.log(chalk.red(`Critical path: ${levels.length} levels, ${minPoints} pts minimum`));
+    console.log(chalk.red('Critical path: ') + chalk.white(levels.length) + chalk.red(' levels, ') + chalk.white(minPoints) + chalk.red(' pts minimum'));
 
     const maxLevelWidth = String(levels.length).length;
     const maxPtsWidth = Math.max(...levels.map((lvl) => {
@@ -228,4 +244,41 @@ export function displaySprints(sprints, { verbose = false } = {}) {
 function truncate(str, len) {
   if (str.length <= len) return str.padEnd(len);
   return str.slice(0, len - 1) + '…';
+}
+
+function formatPts(n) {
+  return chalk.white(n) + chalk.gray(' pts');
+}
+
+function formatBlockers(blockedBy, maxWidth) {
+  if (blockedBy.length === 0) return '';
+
+  const prefix = ' ← ';
+  const shortKeys = blockedBy.map((k) => k.replace(/^[A-Z]+-/, ''));
+
+  // Try to fit as many blockers as possible
+  let result = prefix + shortKeys[0];
+  let shown = 1;
+
+  for (let i = 1; i < shortKeys.length; i++) {
+    const remaining = shortKeys.length - shown;
+    const suffix = remaining > 0 ? `+${remaining}` : '';
+    const candidate = result + ', ' + shortKeys[i];
+    const candidateWithSuffix = candidate + (remaining > 1 ? `+${remaining - 1}` : '');
+
+    // Reserve space for suffix if not all shown
+    if (candidateWithSuffix.length <= maxWidth * 0.4) {
+      result = candidate;
+      shown++;
+    } else {
+      break;
+    }
+  }
+
+  const remaining = shortKeys.length - shown;
+  if (remaining > 0) {
+    result += `+${remaining}`;
+  }
+
+  return result;
 }
