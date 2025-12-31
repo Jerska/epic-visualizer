@@ -75,12 +75,12 @@ try {
   let maxSeq = opts.seq;
 
   if (!hasPoints) {
-    console.warn('Warning: No story points found. Using 1 point per task with defaults (seq=3, total=10).\n');
     for (const issue of allIssues) {
       issue.points = 1;
     }
     if (maxSeq === undefined) maxSeq = 3;
     if (maxPoints === undefined) maxPoints = 10;
+    console.warn(`\nWarning: No story points found. Using 1 point per task (seq=${maxSeq}, total=${maxPoints}).\n`);
   }
 
   if (done.length > 0) {
