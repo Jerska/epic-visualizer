@@ -1,4 +1,4 @@
-export function schedulesprints(issues, maxPoints) {
+export function schedulesprints(issues, maxPoints, maxSeq) {
   const issueMap = new Map(issues.map((i) => [i.key, i]));
 
   // Filter blockedBy to only include issues within the epic
@@ -21,37 +21,67 @@ export function schedulesprints(issues, maxPoints) {
   const completed = new Set();
 
   while (completed.size < issues.length) {
-    // Find issues with all blockers completed
-    const available = issues.filter(
-      (i) => !completed.has(i.key) && i.blockedBy.every((b) => completed.has(b))
-    );
-
-    if (available.length === 0) {
-      throw new Error('Deadlock detected: no available issues but not all completed');
-    }
-
-    // Sort by: critical path first, then most blockers
-    available.sort((a, b) => {
-      if (a.critical !== b.critical) return a.critical ? -1 : 1;
-      return blocks.get(b.key).length - blocks.get(a.key).length;
-    });
-
     const sprint = [];
+    const sprintSet = new Set();
     let sprintPoints = 0;
+    const maxPointsByLevel = new Map(); // Track max points per level for seq calculation
 
-    for (const issue of available) {
-      const canFit = !maxPoints || sprintPoints + issue.points <= maxPoints;
-      if (canFit) {
-        sprint.push(issue);
-        sprintPoints += issue.points;
-        completed.add(issue.key);
+    // Calculate sequential points if we add an issue
+    const getSeqPoints = (issue) => {
+      const currentMax = maxPointsByLevel.get(issue.level) || 0;
+      const newMax = Math.max(currentMax, issue.points);
+      const delta = newMax - currentMax;
+      return [...maxPointsByLevel.values()].reduce((sum, pts) => sum + pts, 0) + delta;
+    };
+
+    // Keep adding tasks until we can't add anymore (allows cascading within sprint)
+    let changed = true;
+    while (changed) {
+      changed = false;
+
+      // Find issues whose blockers are all completed OR in current sprint
+      const available = issues.filter(
+        (i) =>
+          !completed.has(i.key) &&
+          !sprintSet.has(i.key) &&
+          i.blockedBy.every((b) => completed.has(b) || sprintSet.has(b))
+      );
+
+      // Sort by: critical first, then lower level (to enable cascading), then most blockers
+      available.sort((a, b) => {
+        if (a.critical !== b.critical) return a.critical ? -1 : 1;
+        if (a.level !== b.level) return a.level - b.level;
+        return blocks.get(b.key).length - blocks.get(a.key).length;
+      });
+
+      for (const issue of available) {
+        const fitsPoints = !maxPoints || sprintPoints + issue.points <= maxPoints;
+        const fitsSeq = !maxSeq || getSeqPoints(issue) <= maxSeq;
+        if (fitsPoints && fitsSeq) {
+          sprint.push(issue);
+          sprintSet.add(issue.key);
+          sprintPoints += issue.points;
+          const currentMax = maxPointsByLevel.get(issue.level) || 0;
+          maxPointsByLevel.set(issue.level, Math.max(currentMax, issue.points));
+          changed = true;
+        }
       }
     }
 
     // Edge case: single issue exceeds max points, include it anyway
-    if (sprint.length === 0 && available.length > 0) {
+    if (sprint.length === 0) {
+      const available = issues.filter(
+        (i) => !completed.has(i.key) && i.blockedBy.every((b) => completed.has(b))
+      );
+      if (available.length === 0) {
+        throw new Error('Deadlock detected: no available issues but not all completed');
+      }
       sprint.push(available[0]);
-      completed.add(available[0].key);
+    }
+
+    // Mark all sprint tasks as completed
+    for (const issue of sprint) {
+      completed.add(issue.key);
     }
 
     sprints.push(sprint);

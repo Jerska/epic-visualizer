@@ -1,6 +1,7 @@
 import { Version3Client } from 'jira.js';
 
 const STORY_POINTS_FIELD = 'customfield_10033';
+const RANK_FIELD = 'customfield_10011';
 
 export async function fetchEpicIssues({ url, token, email, epicKey }) {
   const authentication = email
@@ -26,7 +27,7 @@ async function searchIssues(client, jql) {
   do {
     const params = {
       jql,
-      fields: ['summary', 'status', 'issuelinks', STORY_POINTS_FIELD],
+      fields: ['summary', 'status', 'issuelinks', STORY_POINTS_FIELD, RANK_FIELD],
       maxResults: 100,
     };
     if (nextPageToken) params.nextPageToken = nextPageToken;
@@ -50,6 +51,7 @@ function normalizeIssue(issue) {
     summary: issue.fields.summary,
     status: issue.fields.status?.name,
     points: issue.fields[STORY_POINTS_FIELD] || 0,
+    rank: issue.fields[RANK_FIELD] || '',
     blockedBy,
   };
 }

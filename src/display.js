@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 
 const WIDTH = Math.min(process.stdout.columns || 100, 120);
-const MARKER_WIDTH = 2;
+const MARKER_WIDTH = 3; // globalMarker + sprintMarker + space
 const KEY_WIDTH = 12;
 const POINTS_WIDTH = 6;
 const PADDING = 4; // 2 spaces indent + 2 spaces between parts
@@ -17,26 +17,78 @@ export function displaySprints(sprints) {
     const points = sprint.reduce((sum, issue) => sum + issue.points, 0);
     totalPoints += points;
 
+    // Calculate sequential points (sum of max points per level within sprint)
+    // and mark tasks on the sprint's critical sequence
+    const byLevel = new Map();
+    for (const issue of sprint) {
+      if (!byLevel.has(issue.level)) byLevel.set(issue.level, []);
+      byLevel.get(issue.level).push(issue);
+    }
+    const seqPoints = [...byLevel.values()].reduce((sum, issues) => sum + Math.max(...issues.map((i) => i.points)), 0);
+
+    // Mark one task per level for the sprint sequence (the one with max points)
+    // Only mark if there are multiple levels (otherwise all tasks are parallel)
+    const sprintCritical = new Set();
+    if (byLevel.size > 1) {
+      const sortedLevels = [...byLevel.keys()].sort((a, b) => a - b);
+      for (const lvl of sortedLevels) {
+        const issues = byLevel.get(lvl);
+        const maxPts = Math.max(...issues.map((i) => i.points));
+        const maxIssue = issues.find((i) => i.points === maxPts);
+        sprintCritical.add(maxIssue.key);
+      }
+    }
+
     console.log();
     console.log(chalk.cyan(line));
+    const ptsDisplay = seqPoints < points ? `${seqPoints}/${points}` : `${points}`;
     console.log(
       chalk.cyan.bold(` Sprint ${i + 1}`) +
-        chalk.gray(`${' '.repeat(WIDTH - 18 - String(points).length)}${points} pts`)
+        chalk.gray(`${' '.repeat(Math.max(1, WIDTH - 18 - ptsDisplay.length))}${ptsDisplay} pts`)
     );
     console.log(chalk.cyan(line));
 
-    for (const issue of sprint) {
-      const marker = issue.critical ? chalk.red('★ ') : '  ';
-      const keyPart = issue.critical
-        ? chalk.red.bold(issue.key.padEnd(KEY_WIDTH))
-        : chalk.yellow(issue.key.padEnd(KEY_WIDTH));
+    // Sort: sequence issues first (by level), then non-sequence (by rank)
+    const sortedSprint = [...sprint].sort((a, b) => {
+      const aInSeq = sprintCritical.has(a.key);
+      const bInSeq = sprintCritical.has(b.key);
+      if (aInSeq && !bInSeq) return -1;
+      if (!aInSeq && bInSeq) return 1;
+      if (aInSeq && bInSeq) return a.level - b.level;
+      return (a.rank || '').localeCompare(b.rank || '');
+    });
+
+    // Build level info for box drawing - only connect different levels
+    const seqTasks = sortedSprint.filter((i) => sprintCritical.has(i.key));
+    const seqLevels = [...new Set(seqTasks.map((i) => i.level))].sort((a, b) => a - b);
+    const lastSeqLevel = seqLevels[seqLevels.length - 1];
+
+    for (let j = 0; j < sortedSprint.length; j++) {
+      const issue = sortedSprint[j];
+      const isSprintCritical = sprintCritical.has(issue.key);
+      const globalMarker = issue.critical ? chalk.red('★') : ' ';
+
+      let sprintMarker = ' ';
+      if (isSprintCritical && seqLevels.length > 1) {
+        sprintMarker = issue.level === lastSeqLevel ? chalk.magenta('└') : chalk.magenta('│');
+      }
+
+      let keyPart = chalk.yellow(issue.key.padEnd(KEY_WIDTH));
+      if (issue.critical) {
+        keyPart = chalk.red.bold(issue.key.padEnd(KEY_WIDTH));
+      } else if (isSprintCritical) {
+        keyPart = chalk.magenta(issue.key.padEnd(KEY_WIDTH));
+      }
+
       const summaryPart = truncate(issue.summary, SUMMARY_WIDTH);
       const pointsPart = chalk.gray(`${issue.points}pts`.padStart(POINTS_WIDTH));
-      console.log(`  ${marker}${keyPart}${summaryPart} ${pointsPart}`);
+      console.log(` ${globalMarker}${sprintMarker} ${keyPart}${summaryPart} ${pointsPart}`);
 
       if (issue.blockedBy.length > 0) {
-        const blockers = issue.blockedBy.join(', ');
-        console.log(chalk.gray(`${' '.repeat(MARKER_WIDTH + KEY_WIDTH + 2)}← blocked by ${blockers}`));
+        const blockers = issue.blockedBy.map((k) => k.replace(/^[A-Z]+-/, '')).join(', ');
+        const continueMarker =
+          isSprintCritical && seqLevels.length > 1 && issue.level !== lastSeqLevel ? chalk.magenta('│') : ' ';
+        console.log(`  ${continueMarker}` + chalk.gray(`${' '.repeat(KEY_WIDTH)}← blocked by ${blockers}`));
       }
 
       if (issue.critical) {

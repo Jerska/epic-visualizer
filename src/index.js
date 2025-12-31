@@ -13,6 +13,7 @@ program
   .option('--email <email>', 'JIRA account email (for Cloud, or set JIRA_EMAIL env var)')
   .option('-u, --url <url>', 'JIRA instance URL (extracted from epic URL if provided)')
   .option('-m, --max-points <number>', 'Maximum story points per sprint', parseFloat)
+  .option('-s, --max-seq <number>', 'Maximum sequential points per sprint', parseFloat)
   .parse();
 
 const opts = program.opts();
@@ -51,7 +52,7 @@ async function main() {
       return;
     }
 
-    const sprints = schedulesprints(issues, opts.maxPoints);
+    const sprints = schedulesprints(issues, opts.maxPoints, opts.maxSeq);
     displaySprints(sprints);
   } catch (err) {
     console.error('Error:', err.message);
