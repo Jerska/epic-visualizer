@@ -21,6 +21,7 @@
   "dependencies": {
     "chalk": "^5.6.2",
     "commander": "^14.0.2",
+    "dotenv": "^17.2.3",
     "jira.js": "^5.2.2"
   }
 }

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import 'dotenv/config';
 import { program } from 'commander';
 import { fetchEpicIssues } from './jira.js';
 import { scheduleSprints } from './scheduler.js';

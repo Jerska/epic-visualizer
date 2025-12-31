@@ -29,6 +29,8 @@ epic-visualizer -e https://your-jira.atlassian.net/browse/PROJ-123
 
 ## Environment Variables
 
+Environment variables can be set in a `.env` file in the project root. See `.env.example` for reference.
+
 | Variable | Description |
 |----------|-------------|
 | `JIRA_TOKEN` | JIRA API token |
