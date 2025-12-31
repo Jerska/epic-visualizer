@@ -67,12 +67,28 @@ try {
     process.exit(0);
   }
 
+  // Check if any issues have points
+  const allIssues = [...done, ...pending];
+  const hasPoints = allIssues.some((i) => i.points > 0);
+
+  let maxPoints = opts.points;
+  let maxSeq = opts.seq;
+
+  if (!hasPoints) {
+    console.warn('Warning: No story points found. Using 1 point per task with defaults (seq=3, total=10).\n');
+    for (const issue of allIssues) {
+      issue.points = 1;
+    }
+    if (maxSeq === undefined) maxSeq = 3;
+    if (maxPoints === undefined) maxPoints = 10;
+  }
+
   if (done.length > 0) {
     displayCompleted(done);
   }
 
   if (pending.length > 0) {
-    const sprints = scheduleSprints(pending, opts.points, opts.seq);
+    const sprints = scheduleSprints(pending, maxPoints, maxSeq);
     displaySprints(sprints, {
       verbose: opts.verbose,
       startDate: opts.start,
