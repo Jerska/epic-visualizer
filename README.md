@@ -1,6 +1,15 @@
 # epic-visualizer
 
-CLI tool that displays the optimal sprint sequence for a JIRA epic, respecting "is blocked by" dependencies.
+CLI tool that visualizes and schedules JIRA epic tasks into sprints, respecting "is blocked by" dependencies.
+
+**Features:**
+- Schedules tasks into sprints based on dependency chains and point limits
+- Identifies the critical path (minimum sprints required)
+- Shows sprint depth for each task (how many tasks must complete first)
+- Highlights the longest sequence contributing to sprint duration
+- Optionally displays sprint dates
+- Handles completed vs pending tasks separately
+- Falls back to 1 point per task when story points are missing
 
 ## Installation
 
