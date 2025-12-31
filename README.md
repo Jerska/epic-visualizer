@@ -43,6 +43,7 @@ Environment variables can be set in a `.env` file in the project root. See `.env
 ## Output
 
 - Tasks are grouped into sprints respecting dependencies
-- `★` marks tasks on the global critical path
-- `│` `└` show the sprint's sequential chain
-- Each sprint shows `seq/total pts` when parallelization is possible
+- Tasks sorted by sprint depth (how many tasks must complete first), grouped with `│` `└`
+- First column: critical path step number (red)
+- Second column: sprint depth number, `›` marks tasks in the longest sequence
+- Each sprint shows `seq N pts · total N pts` when parallelization is possible
