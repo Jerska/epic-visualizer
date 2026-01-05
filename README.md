@@ -7,6 +7,7 @@ CLI tool that visualizes and schedules JIRA epic tasks into sprints, respecting 
 - Identifies the critical path (minimum sprints required)
 - Shows sprint depth for each task (how many tasks must complete first)
 - Highlights the longest sequence contributing to sprint duration
+- Assigns tasks to people, minimizing inter-person dependencies
 - Optionally displays sprint dates
 - Handles completed vs pending tasks separately
 - Falls back to 1 point per task when story points are missing
@@ -32,9 +33,10 @@ node src/index.js --epic https://your-jira.atlassian.net/browse/PROJ-123 --seq 2
 | `-u, --user <email>` | JIRA account email for Cloud (or `JIRA_USER` env var) |
 | `-p, --points <n>` | Maximum total points per sprint |
 | `-s, --seq <n>` | Maximum sequential points per sprint |
-| `-v, --verbose` | Show critical path details |
+| `-v, --verbose` | Show critical path details and per-person task assignments |
 | `-d, --start <date>` | Sprint start date (YYYY-MM-DD) |
 | `-w, --weeks <n>` | Sprint duration in weeks |
+| `-n, --people <n>` | Number of people per sprint (assigns tasks to individuals) |
 
 ## Environment Variables
 
@@ -56,3 +58,4 @@ Environment variables can be set in a `.env` file in the project root. See `.env
 - First column: critical path step number (red)
 - Second column: sprint depth number, `›` marks tasks in the longest sequence
 - Each sprint shows `seq N pts · total N pts` when parallelization is possible
+- With `--people`, each task shows `[PN]` assignment; use `-v` for per-person summaries
