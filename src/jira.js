@@ -20,7 +20,9 @@ export async function fetchEpicIssues({ url, token, user, epicKey }) {
   }
 
   // Try both JQL syntaxes (team-managed vs company-managed)
-  const excludeList = EXCLUDE_STATUSES.split(',').map((s) => `"${s.trim()}"`).join(', ');
+  const excludeList = EXCLUDE_STATUSES.split(',')
+    .map((s) => `"${s.trim()}"`)
+    .join(', ');
   const statusFilter = `AND status NOT IN (${excludeList})`;
   let issues = await searchIssues(client, `parent = ${epicKey} ${statusFilter}`);
   if (issues.length === 0) {

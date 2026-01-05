@@ -60,7 +60,12 @@ const jiraUrl = urlMatch[1];
 const epicKey = urlMatch[2];
 
 try {
-  const { done, pending } = await fetchEpicIssues({ url: jiraUrl, token, user, epicKey });
+  const { done, pending } = await fetchEpicIssues({
+    url: jiraUrl,
+    token,
+    user,
+    epicKey,
+  });
 
   if (done.length === 0 && pending.length === 0) {
     console.log('No issues found in epic.');

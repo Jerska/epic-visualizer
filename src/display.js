@@ -44,7 +44,10 @@ export function displayCompleted(done) {
       chainLength.set(issue.key, issue.points);
       chainPrev.set(issue.key, null);
     } else {
-      const blockerChains = blockersInDone.map((b) => ({ key: b, len: chainLength.get(b) || 0 }));
+      const blockerChains = blockersInDone.map((b) => ({
+        key: b,
+        len: chainLength.get(b) || 0,
+      }));
       const maxBlocker = blockerChains.reduce((a, b) => (a.len >= b.len ? a : b));
       chainLength.set(issue.key, maxBlocker.len + issue.points);
       chainPrev.set(issue.key, maxBlocker.key);
@@ -64,13 +67,11 @@ export function displayCompleted(done) {
 
   console.log();
   const ptsDisplayRaw = seqPoints < points ? `seq ${seqPoints} pts · total ${points} pts` : `${points} pts`;
-  const ptsDisplay = seqPoints < points
-    ? chalk.gray('seq ') + formatPts(seqPoints) + chalk.gray(' · total ') + formatPts(points)
-    : formatPts(points);
-  console.log(
-    chalk.green.bold(` Completed`) +
-      ' '.repeat(Math.max(1, WIDTH - 14 - ptsDisplayRaw.length)) + ptsDisplay
-  );
+  const ptsDisplay =
+    seqPoints < points
+      ? chalk.gray('seq ') + formatPts(seqPoints) + chalk.gray(' · total ') + formatPts(points)
+      : formatPts(points);
+  console.log(chalk.green.bold(` Completed`) + ' '.repeat(Math.max(1, WIDTH - 14 - ptsDisplayRaw.length)) + ptsDisplay);
   console.log(chalk.green(line));
 
   // Sort by chain position
@@ -154,7 +155,10 @@ export function displaySprints(sprints, { verbose = false, startDate, sprintWeek
         chainLength.set(issue.key, issue.points);
         chainPrev.set(issue.key, null);
       } else {
-        const blockerChains = blockersInSprint.map((b) => ({ key: b, len: chainLength.get(b) || 0 }));
+        const blockerChains = blockersInSprint.map((b) => ({
+          key: b,
+          len: chainLength.get(b) || 0,
+        }));
         const maxBlocker = blockerChains.reduce((a, b) => (a.len >= b.len ? a : b));
         chainLength.set(issue.key, maxBlocker.len + issue.points);
         chainPrev.set(issue.key, maxBlocker.key);
@@ -178,15 +182,13 @@ export function displaySprints(sprints, { verbose = false, startDate, sprintWeek
     const datesRaw = dates ? ` (${dates})` : '';
     const datesDisplay = dates ? chalk.gray(` (${dates})`) : '';
     const ptsDisplayRaw = seqPoints < points ? `seq ${seqPoints} pts · total ${points} pts` : `${points} pts`;
-    const ptsDisplay = seqPoints < points
-      ? chalk.gray('seq ') + formatPts(seqPoints) + chalk.gray(' · total ') + formatPts(points)
-      : formatPts(points);
+    const ptsDisplay =
+      seqPoints < points
+        ? chalk.gray('seq ') + formatPts(seqPoints) + chalk.gray(' · total ') + formatPts(points)
+        : formatPts(points);
     const sprintLabel = ` Sprint ${i + 1}`;
     const headerLen = sprintLabel.length + datesRaw.length + ptsDisplayRaw.length;
-    console.log(
-      chalk.cyan.bold(sprintLabel) + datesDisplay +
-        ' '.repeat(Math.max(1, WIDTH - headerLen)) + ptsDisplay
-    );
+    console.log(chalk.cyan.bold(sprintLabel) + datesDisplay + ' '.repeat(Math.max(1, WIDTH - headerLen)) + ptsDisplay);
     console.log(chalk.cyan(line));
 
     // Calculate sprint depth (how many layers before task can start)
@@ -211,7 +213,9 @@ export function displaySprints(sprints, { verbose = false, startDate, sprintWeek
     const byCriticalFirst = (a, b) => (a.critical === b.critical ? 0 : a.critical ? -1 : 1);
     const bySeqFirst = (a, b) => (inSeq(a) === inSeq(b) ? 0 : inSeq(a) ? -1 : 1);
     const byRank = (a, b) => (a.rank || '').localeCompare(b.rank || '');
-    const sortedSprint = [...sprint].sort((a, b) => byDepth(a, b) || byCriticalFirst(a, b) || bySeqFirst(a, b) || byRank(a, b));
+    const sortedSprint = [...sprint].sort(
+      (a, b) => byDepth(a, b) || byCriticalFirst(a, b) || bySeqFirst(a, b) || byRank(a, b),
+    );
 
     for (let idx = 0; idx < sortedSprint.length; idx++) {
       const issue = sortedSprint[idx];
@@ -275,8 +279,23 @@ export function displaySprints(sprints, { verbose = false, startDate, sprintWeek
     end.setDate(end.getDate() + sprints.length * sprintWeeks * 7 - 1);
     endDateDisplay = chalk.green.bold(', ends ') + chalk.white(fmtDate(end));
   }
-  console.log(chalk.green.bold('Total: ') + chalk.white(sprints.length) + chalk.green.bold(' sprints, ') + chalk.white(totalPoints) + chalk.green.bold(' points') + endDateDisplay);
-  console.log(chalk.gray('Legend: ') + chalk.red('N') + chalk.gray(' = critical path step · ') + chalk.gray('N') + chalk.gray(' = sprint depth · ') + chalk.magenta('›') + chalk.gray(' = longest sequence'));
+  console.log(
+    chalk.green.bold('Total: ') +
+      chalk.white(sprints.length) +
+      chalk.green.bold(' sprints, ') +
+      chalk.white(totalPoints) +
+      chalk.green.bold(' points') +
+      endDateDisplay,
+  );
+  console.log(
+    chalk.gray('Legend: ') +
+      chalk.red('N') +
+      chalk.gray(' = critical path step · ') +
+      chalk.gray('N') +
+      chalk.gray(' = sprint depth · ') +
+      chalk.magenta('›') +
+      chalk.gray(' = longest sequence'),
+  );
 
   // Display critical path grouped by level (only in verbose mode)
   if (verbose && criticalByLevel.size > 0) {
@@ -285,13 +304,21 @@ export function displaySprints(sprints, { verbose = false, startDate, sprintWeek
     const minPoints = maxPointsPerLevel.reduce((sum, pts) => sum + pts, 0);
 
     console.log();
-    console.log(chalk.red('Critical path: ') + chalk.white(levels.length) + chalk.red(' levels, ') + chalk.white(minPoints) + chalk.red(' pts minimum'));
+    console.log(
+      chalk.red('Critical path: ') +
+        chalk.white(levels.length) +
+        chalk.red(' levels, ') +
+        chalk.white(minPoints) +
+        chalk.red(' pts minimum'),
+    );
 
     const maxLevelWidth = String(levels.length).length;
-    const maxPtsWidth = Math.max(...levels.map((lvl) => {
-      const issues = criticalByLevel.get(lvl);
-      return String(Math.max(...issues.map((i) => i.points))).length;
-    }));
+    const maxPtsWidth = Math.max(
+      ...levels.map((lvl) => {
+        const issues = criticalByLevel.get(lvl);
+        return String(Math.max(...issues.map((i) => i.points))).length;
+      }),
+    );
 
     for (const lvl of levels) {
       const issues = criticalByLevel.get(lvl);
@@ -300,7 +327,9 @@ export function displaySprints(sprints, { verbose = false, startDate, sprintWeek
       const parallel = issues.length > 1 ? chalk.gray(' (parallel)') : '';
       const lvlStr = String(lvl).padStart(maxLevelWidth);
       const ptsStr = String(maxPts).padStart(maxPtsWidth);
-      console.log(chalk.gray(`  ${lvlStr}. `) + chalk.white(ptsStr) + chalk.gray(` pts → `) + chalk.white(`[${keys}]`) + parallel);
+      console.log(
+        chalk.gray(`  ${lvlStr}. `) + chalk.white(ptsStr) + chalk.gray(` pts → `) + chalk.white(`[${keys}]`) + parallel,
+      );
     }
   }
 }

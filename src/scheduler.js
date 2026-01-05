@@ -29,9 +29,7 @@ export function scheduleSprints(issues, maxPoints, maxSeq) {
     // Calculate sequential points (longest chain) if we add an issue
     const getSeqPoints = (issue) => {
       // Find max chain length among blockers already in sprint
-      const blockerChains = issue.blockedBy
-        .filter((b) => sprintSet.has(b))
-        .map((b) => chainLength.get(b) || 0);
+      const blockerChains = issue.blockedBy.filter((b) => sprintSet.has(b)).map((b) => chainLength.get(b) || 0);
       const maxBlockerChain = blockerChains.length > 0 ? Math.max(...blockerChains) : 0;
       const issueChainLength = maxBlockerChain + issue.points;
 
@@ -64,9 +62,7 @@ export function scheduleSprints(issues, maxPoints, maxSeq) {
           sprintSet.add(issue.key);
           sprintPoints += issue.points;
           // Update chain length for this issue
-          const blockerChains = issue.blockedBy
-            .filter((b) => sprintSet.has(b))
-            .map((b) => chainLength.get(b) || 0);
+          const blockerChains = issue.blockedBy.filter((b) => sprintSet.has(b)).map((b) => chainLength.get(b) || 0);
           const maxBlockerChain = blockerChains.length > 0 ? Math.max(...blockerChains) : 0;
           chainLength.set(issue.key, maxBlockerChain + issue.points);
           changed = true;
@@ -76,9 +72,7 @@ export function scheduleSprints(issues, maxPoints, maxSeq) {
 
     // Edge case: single issue exceeds max points, include it anyway
     if (sprint.length === 0) {
-      const available = issues.filter(
-        (i) => !completed.has(i.key) && i.blockedBy.every((b) => completed.has(b))
-      );
+      const available = issues.filter((i) => !completed.has(i.key) && i.blockedBy.every((b) => completed.has(b)));
       if (available.length === 0) {
         throw new Error('Deadlock detected: no available issues but not all completed');
       }
