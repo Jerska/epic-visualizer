@@ -12,6 +12,13 @@ export async function fetchEpicIssues({ url, token, user, epicKey }) {
 
   const client = new Version3Client({ host: url, authentication });
 
+  // Verify we can access the epic
+  try {
+    await client.issues.getIssue({ issueIdOrKey: epicKey });
+  } catch (err) {
+    throw handleJiraError(err, `Cannot access epic ${epicKey}`);
+  }
+
   // Try both JQL syntaxes (team-managed vs company-managed)
   const excludeList = EXCLUDE_STATUSES.split(',').map((s) => `"${s.trim()}"`).join(', ');
   const statusFilter = `AND status NOT IN (${excludeList})`;
@@ -42,13 +49,42 @@ async function searchIssues(client, jql) {
     };
     if (nextPageToken) params.nextPageToken = nextPageToken;
 
-    const response = await client.issueSearch.searchForIssuesUsingJqlEnhancedSearchPost(params);
+    let response;
+    try {
+      response = await client.issueSearch.searchForIssuesUsingJqlEnhancedSearchPost(params);
+    } catch (err) {
+      throw handleJiraError(err, 'Search failed');
+    }
+
+    if (!response || !Array.isArray(response.issues)) {
+      throw new Error('Unexpected API response: no issues array returned.');
+    }
 
     results.push(...response.issues);
     nextPageToken = response.nextPageToken;
   } while (nextPageToken);
 
   return results;
+}
+
+function handleJiraError(err, context) {
+  const status = err.status || err.response?.status;
+  const data = err.response?.data;
+
+  if (status === 401) {
+    return new Error(`${context}: Authentication failed. Check your JIRA_TOKEN.`);
+  }
+  if (status === 403) {
+    return new Error(`${context}: Permission denied. Token may lack required access.`);
+  }
+  if (status === 404) {
+    const messages = data?.errorMessages?.join('; ') || 'Not found or no access';
+    return new Error(`${context}: ${messages}`);
+  }
+
+  // For other errors, include status if available
+  const statusInfo = status ? ` (HTTP ${status})` : '';
+  return new Error(`${context}${statusInfo}: ${err.message}`);
 }
 
 function normalizeIssue(issue) {
