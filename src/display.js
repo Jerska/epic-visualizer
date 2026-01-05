@@ -276,6 +276,24 @@ export function displaySprints(sprints, { verbose = false, startDate, sprintWeek
         console.log();
       }
     }
+
+    // Show per-person task breakdown in verbose mode
+    if (verbose && assignment) {
+      const byPerson = new Map();
+      for (const issue of sprint) {
+        const personIdx = assignment.get(issue.key);
+        if (!byPerson.has(personIdx)) byPerson.set(personIdx, []);
+        byPerson.get(personIdx).push(issue);
+      }
+
+      console.log();
+      console.log(chalk.gray('  Assignments:'));
+      for (const [personIdx, tasks] of [...byPerson.entries()].sort((a, b) => a[0] - b[0])) {
+        const pts = tasks.reduce((sum, t) => sum + t.points, 0);
+        const keys = tasks.map((t) => t.key.replace(/^[A-Z]+-/, '')).join(', ');
+        console.log(chalk.blue(`    P${personIdx + 1}`) + chalk.gray(` (${pts} pts): `) + chalk.white(keys));
+      }
+    }
   }
 
   console.log();
