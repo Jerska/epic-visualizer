@@ -17,6 +17,7 @@ program
   .option('-v, --verbose', 'Show critical path details')
   .option('-d, --start <date>', 'Sprint start date (YYYY-MM-DD)')
   .option('-w, --weeks <number>', 'Sprint duration in weeks', parseFloat)
+  .option('-n, --people <number>', 'Number of people per sprint (assigns tasks to individuals)', parseInt)
   .parse();
 
 const opts = program.opts();
@@ -47,6 +48,11 @@ if (opts.start !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(opts.start)) {
 
 if (opts.weeks !== undefined && (isNaN(opts.weeks) || opts.weeks <= 0)) {
   console.error('Error: -w/--weeks must be a positive number.');
+  process.exit(1);
+}
+
+if (opts.people !== undefined && (isNaN(opts.people) || opts.people <= 0)) {
+  console.error('Error: -n/--people must be a positive integer.');
   process.exit(1);
 }
 
@@ -98,6 +104,8 @@ try {
       verbose: opts.verbose,
       startDate: opts.start,
       sprintWeeks: opts.weeks,
+      numPeople: opts.people,
+      maxSeq,
     });
   }
 } catch (err) {

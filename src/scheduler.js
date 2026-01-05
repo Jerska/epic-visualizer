@@ -145,6 +145,135 @@ function markCriticalPath(issues, issueMap, blocks) {
   }
 }
 
+// Find connected components (dependency groups) within a sprint
+function findDependencyGroups(sprint) {
+  const sprintKeys = new Set(sprint.map((i) => i.key));
+  const issueMap = new Map(sprint.map((i) => [i.key, i]));
+
+  // Build adjacency list (undirected - both directions count as connected)
+  const adj = new Map();
+  for (const issue of sprint) {
+    if (!adj.has(issue.key)) adj.set(issue.key, new Set());
+    for (const blocker of issue.blockedBy) {
+      if (sprintKeys.has(blocker)) {
+        adj.get(issue.key).add(blocker);
+        if (!adj.has(blocker)) adj.set(blocker, new Set());
+        adj.get(blocker).add(issue.key);
+      }
+    }
+  }
+
+  // Find connected components via DFS
+  const visited = new Set();
+  const groups = [];
+
+  for (const issue of sprint) {
+    if (visited.has(issue.key)) continue;
+
+    const component = [];
+    const stack = [issue.key];
+    while (stack.length > 0) {
+      const key = stack.pop();
+      if (visited.has(key)) continue;
+      visited.add(key);
+      component.push(issueMap.get(key));
+      for (const neighbor of adj.get(key) || []) {
+        if (!visited.has(neighbor)) stack.push(neighbor);
+      }
+    }
+
+    const points = component.reduce((sum, i) => sum + i.points, 0);
+    groups.push({ tasks: component, points });
+  }
+
+  return groups;
+}
+
+// Assign tasks to people, minimizing inter-person dependencies
+export function assignToPeople(sprint, maxSeq, numPeople) {
+  if (!numPeople || numPeople <= 0) return null;
+
+  const people = Array.from({ length: numPeople }, () => ({ tasks: [], points: 0 }));
+  const assignment = new Map(); // key -> person index
+
+  // Find connected components
+  const groups = findDependencyGroups(sprint);
+
+  // Sort groups by total points descending (assign biggest first)
+  groups.sort((a, b) => b.points - a.points);
+
+  for (const group of groups) {
+    if (group.points <= maxSeq) {
+      // Group fits in one person - find person with fewest points who can fit it
+      const eligible = people
+        .map((p, idx) => ({ p, idx }))
+        .filter(({ p }) => p.points + group.points <= maxSeq)
+        .sort((a, b) => a.p.points - b.p.points);
+
+      if (eligible.length > 0) {
+        const { p, idx } = eligible[0];
+        p.tasks.push(...group.tasks);
+        p.points += group.points;
+        for (const task of group.tasks) assignment.set(task.key, idx);
+      } else {
+        // No single person can fit - distribute to person with most capacity
+        const byCapacity = people.map((p, idx) => ({ p, idx })).sort((a, b) => a.p.points - b.p.points);
+        const { p, idx } = byCapacity[0];
+        p.tasks.push(...group.tasks);
+        p.points += group.points;
+        for (const task of group.tasks) assignment.set(task.key, idx);
+      }
+    } else {
+      // Group exceeds maxSeq - need to split
+      // Sort tasks by dependency depth (tasks with no local blockers first)
+      const sprintKeys = new Set(sprint.map((i) => i.key));
+      const localDepth = new Map();
+
+      function calcLocalDepth(task) {
+        if (localDepth.has(task.key)) return localDepth.get(task.key);
+        const localBlockers = task.blockedBy.filter((b) => sprintKeys.has(b));
+        if (localBlockers.length === 0) {
+          localDepth.set(task.key, 0);
+          return 0;
+        }
+        const taskMap = new Map(group.tasks.map((t) => [t.key, t]));
+        const maxBlockerDepth = Math.max(...localBlockers.map((b) => calcLocalDepth(taskMap.get(b))));
+        const d = maxBlockerDepth + 1;
+        localDepth.set(task.key, d);
+        return d;
+      }
+
+      for (const task of group.tasks) calcLocalDepth(task);
+      const sortedTasks = [...group.tasks].sort((a, b) => localDepth.get(a.key) - localDepth.get(b.key));
+
+      // Greedily assign tasks to people
+      for (const task of sortedTasks) {
+        // Find person with fewest points who can fit this task
+        const eligible = people
+          .map((p, idx) => ({ p, idx }))
+          .filter(({ p }) => p.points + task.points <= maxSeq)
+          .sort((a, b) => a.p.points - b.p.points);
+
+        if (eligible.length > 0) {
+          const { p, idx } = eligible[0];
+          p.tasks.push(task);
+          p.points += task.points;
+          assignment.set(task.key, idx);
+        } else {
+          // Overflow - assign to person with fewest points anyway
+          const byCapacity = people.map((p, idx) => ({ p, idx })).sort((a, b) => a.p.points - b.p.points);
+          const { p, idx } = byCapacity[0];
+          p.tasks.push(task);
+          p.points += task.points;
+          assignment.set(task.key, idx);
+        }
+      }
+    }
+  }
+
+  return assignment;
+}
+
 function detectCycles(issues) {
   const visited = new Set();
   const recStack = new Set();

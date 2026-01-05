@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import { assignToPeople } from './scheduler.js';
 
 const WIDTH = process.stdout.columns || 100;
 const MARKER_WIDTH = 3; // globalMarker (2) + space
@@ -116,7 +117,7 @@ export function displayCompleted(done) {
   }
 }
 
-export function displaySprints(sprints, { verbose = false, startDate, sprintWeeks } = {}) {
+export function displaySprints(sprints, { verbose = false, startDate, sprintWeeks, numPeople, maxSeq } = {}) {
   const line = '━'.repeat(WIDTH);
   let totalPoints = 0;
   const criticalByLevel = new Map();
@@ -187,9 +188,12 @@ export function displaySprints(sprints, { verbose = false, startDate, sprintWeek
         ? chalk.gray('seq ') + formatPts(seqPoints) + chalk.gray(' · total ') + formatPts(points)
         : formatPts(points);
     const sprintLabel = ` Sprint ${i + 1}`;
-    const headerLen = sprintLabel.length + datesRaw.length + ptsDisplayRaw.length;
+    const headerLen = sprintLabel.length + datesRaw.length + ptsDisplayRaw.length + 4; // +4 for right margin
     console.log(chalk.cyan.bold(sprintLabel) + datesDisplay + ' '.repeat(Math.max(1, WIDTH - headerLen)) + ptsDisplay);
     console.log(chalk.cyan(line));
+
+    // Assign tasks to people if numPeople is specified
+    const assignment = assignToPeople(sprint, maxSeq, numPeople);
 
     // Calculate sprint depth (how many layers before task can start)
     const sprintDepth = new Map();
@@ -252,9 +256,11 @@ export function displaySprints(sprints, { verbose = false, startDate, sprintWeek
       const blockersRaw = formatBlockers(issue.blockedBy, SUMMARY_WIDTH);
       const blockersPart = blockersRaw ? chalk.gray(blockersRaw) : '';
 
-      const summaryPart = truncate(issue.summary, SUMMARY_WIDTH - blockersRaw.length);
+      const personWidth = assignment ? 5 : 0; // " [P1]" = 5 chars
+      const summaryPart = truncate(issue.summary, SUMMARY_WIDTH - blockersRaw.length - personWidth);
       const pointsPart = chalk.white(String(issue.points).padStart(POINTS_WIDTH - 4)) + chalk.gray(' pts');
-      console.log(` ${globalMarker} ${depthPart} ${keyPart}${summaryPart}${blockersPart} ${pointsPart}`);
+      const personPart = assignment ? chalk.blue(` [P${assignment.get(issue.key) + 1}]`) : '';
+      console.log(` ${globalMarker} ${depthPart} ${keyPart}${summaryPart}${blockersPart} ${pointsPart}${personPart}`);
 
       if (issue.critical) {
         if (!criticalByLevel.has(issue.level)) {
@@ -287,15 +293,15 @@ export function displaySprints(sprints, { verbose = false, startDate, sprintWeek
       chalk.green.bold(' points') +
       endDateDisplay,
   );
-  console.log(
-    chalk.gray('Legend: ') +
-      chalk.red('N') +
-      chalk.gray(' = critical path step · ') +
-      chalk.gray('N') +
-      chalk.gray(' = sprint depth · ') +
-      chalk.magenta('›') +
-      chalk.gray(' = longest sequence'),
-  );
+  const legendParts = [
+    chalk.red('N') + chalk.gray(' = critical path step'),
+    chalk.gray('N') + chalk.gray(' = sprint depth'),
+    chalk.magenta('›') + chalk.gray(' = longest sequence'),
+  ];
+  if (numPeople) {
+    legendParts.push(chalk.blue('[PN]') + chalk.gray(' = person assignment'));
+  }
+  console.log(chalk.gray('Legend: ') + legendParts.join(chalk.gray(' · ')));
 
   // Display critical path grouped by level (only in verbose mode)
   if (verbose && criticalByLevel.size > 0) {
