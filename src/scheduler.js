@@ -224,19 +224,19 @@ export function assignToPeople(sprint, maxSeq, numPeople) {
         for (const task of group.tasks) assignment.set(task.key, idx);
       }
     } else {
-      // Group exceeds maxSeq - need to split
-      // Sort tasks by dependency depth (tasks with no local blockers first)
+      // Group exceeds maxSeq - need to split while minimizing cross-person dependencies
       const sprintKeys = new Set(sprint.map((i) => i.key));
+      const groupKeys = new Set(group.tasks.map((t) => t.key));
+      const taskMap = new Map(group.tasks.map((t) => [t.key, t]));
       const localDepth = new Map();
 
       function calcLocalDepth(task) {
         if (localDepth.has(task.key)) return localDepth.get(task.key);
-        const localBlockers = task.blockedBy.filter((b) => sprintKeys.has(b));
+        const localBlockers = task.blockedBy.filter((b) => groupKeys.has(b));
         if (localBlockers.length === 0) {
           localDepth.set(task.key, 0);
           return 0;
         }
-        const taskMap = new Map(group.tasks.map((t) => [t.key, t]));
         const maxBlockerDepth = Math.max(...localBlockers.map((b) => calcLocalDepth(taskMap.get(b))));
         const d = maxBlockerDepth + 1;
         localDepth.set(task.key, d);
@@ -246,27 +246,40 @@ export function assignToPeople(sprint, maxSeq, numPeople) {
       for (const task of group.tasks) calcLocalDepth(task);
       const sortedTasks = [...group.tasks].sort((a, b) => localDepth.get(a.key) - localDepth.get(b.key));
 
-      // Greedily assign tasks to people
+      // Assign tasks, preferring the same person as blockers to minimize cross-dependencies
       for (const task of sortedTasks) {
-        // Find person with fewest points who can fit this task
-        const eligible = people
-          .map((p, idx) => ({ p, idx }))
-          .filter(({ p }) => p.points + task.points <= maxSeq)
-          .sort((a, b) => a.p.points - b.p.points);
+        const localBlockers = task.blockedBy.filter((b) => groupKeys.has(b));
 
-        if (eligible.length > 0) {
-          const { p, idx } = eligible[0];
-          p.tasks.push(task);
-          p.points += task.points;
-          assignment.set(task.key, idx);
-        } else {
-          // Overflow - assign to person with fewest points anyway
-          const byCapacity = people.map((p, idx) => ({ p, idx })).sort((a, b) => a.p.points - b.p.points);
-          const { p, idx } = byCapacity[0];
-          p.tasks.push(task);
-          p.points += task.points;
-          assignment.set(task.key, idx);
+        // Count how many blockers each person has for this task
+        const blockerCountByPerson = new Map();
+        for (const blocker of localBlockers) {
+          const blockerPerson = assignment.get(blocker);
+          if (blockerPerson !== undefined) {
+            blockerCountByPerson.set(blockerPerson, (blockerCountByPerson.get(blockerPerson) || 0) + 1);
+          }
         }
+
+        // Sort people by: most blockers (desc), then fewest points (asc)
+        const candidates = people
+          .map((p, idx) => ({
+            p,
+            idx,
+            blockerCount: blockerCountByPerson.get(idx) || 0,
+            canFit: p.points + task.points <= maxSeq,
+          }))
+          .sort((a, b) => {
+            // Prefer person with more blockers
+            if (b.blockerCount !== a.blockerCount) return b.blockerCount - a.blockerCount;
+            // Then prefer person who can fit the task
+            if (a.canFit !== b.canFit) return a.canFit ? -1 : 1;
+            // Then prefer person with fewer points
+            return a.p.points - b.p.points;
+          });
+
+        const { p, idx } = candidates[0];
+        p.tasks.push(task);
+        p.points += task.points;
+        assignment.set(task.key, idx);
       }
     }
   }
