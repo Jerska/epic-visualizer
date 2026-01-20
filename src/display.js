@@ -75,15 +75,11 @@ export function displayCompleted(done) {
   console.log(chalk.green.bold(` Completed`) + ' '.repeat(Math.max(1, WIDTH - 14 - ptsDisplayRaw.length)) + ptsDisplay);
   console.log(chalk.green(line));
 
-  // Sort by chain position
-  const inSeq = (i) => completedCritical.has(i.key);
-  const bySeqFirst = (a, b) => (inSeq(a) === inSeq(b) ? 0 : inSeq(a) ? -1 : 1);
-  const byChainLength = (a, b) => (chainLength.get(a.key) || 0) - (chainLength.get(b.key) || 0);
+  // Sort: done items first (by resolution date), then in-review (by rank)
+  const byInReviewLast = (a, b) => (a.inReview === b.inReview ? 0 : a.inReview ? 1 : -1);
+  const byResolvedAt = (a, b) => (a.resolvedAt || '').localeCompare(b.resolvedAt || '');
   const byRank = (a, b) => (a.rank || '').localeCompare(b.rank || '');
-  const sorted = [...done].sort((a, b) => bySeqFirst(a, b) || byChainLength(a, b) || byRank(a, b));
-
-  const seqTasks = sorted.filter(inSeq);
-  const lastSeqKey = seqTasks.length > 0 ? seqTasks[seqTasks.length - 1].key : null;
+  const sorted = [...done].sort((a, b) => byInReviewLast(a, b) || byResolvedAt(a, b) || byRank(a, b));
 
   // Calculate depth within completed tasks
   const completedDepth = new Map();
@@ -102,7 +98,7 @@ export function displayCompleted(done) {
   for (const issue of done) calcCompletedDepth(issue.key);
 
   for (const issue of sorted) {
-    const marker = chalk.green('✓ '); // 2 chars like globalMarker
+    const marker = issue.inReview ? chalk.yellow('◎ ') : chalk.green('✓ '); // 2 chars like globalMarker
     const depth = completedDepth.get(issue.key) || 0;
     const depthPart = depth > 0 ? chalk.gray(String(depth)) + '  ' : '   ';
 

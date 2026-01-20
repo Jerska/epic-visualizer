@@ -4,6 +4,7 @@ const STORY_POINTS_FIELD = process.env.JIRA_STORY_POINTS_FIELD || 'customfield_1
 const RANK_FIELD = process.env.JIRA_RANK_FIELD || 'customfield_10011';
 const EXCLUDE_STATUSES = process.env.JIRA_EXCLUDE_STATUSES || "Won't Do,Wontdo,WONTDO";
 const DONE_STATUSES = process.env.JIRA_DONE_STATUSES || 'Done,DONE';
+const IN_REVIEW_STATUSES = process.env.JIRA_IN_REVIEW_STATUSES || 'In Review,IN REVIEW';
 
 export async function fetchEpicIssues({ url, token, user, epicKey }) {
   const authentication = user
@@ -29,13 +30,19 @@ export async function fetchEpicIssues({ url, token, user, epicKey }) {
     issues = await searchIssues(client, `"Epic Link" = ${epicKey} ${statusFilter}`);
   }
 
-  const normalized = issues.map(normalizeIssue);
   const doneList = DONE_STATUSES.split(',').map((s) => s.trim().toLowerCase());
-  const isDone = (issue) => doneList.includes((issue.status || '').toLowerCase());
+  const inReviewList = IN_REVIEW_STATUSES.split(',').map((s) => s.trim().toLowerCase());
+  const isInReview = (status) => inReviewList.includes((status || '').toLowerCase());
+  const isDone = (status) => doneList.includes((status || '').toLowerCase()) || isInReview(status);
+
+  const normalized = issues.map((issue) => ({
+    ...normalizeIssue(issue),
+    inReview: isInReview(issue.fields.status?.name),
+  }));
 
   return {
-    done: normalized.filter(isDone),
-    pending: normalized.filter((i) => !isDone(i)),
+    done: normalized.filter((i) => isDone(i.status)),
+    pending: normalized.filter((i) => !isDone(i.status)),
   };
 }
 
@@ -46,7 +53,7 @@ async function searchIssues(client, jql) {
   do {
     const params = {
       jql,
-      fields: ['summary', 'status', 'issuelinks', STORY_POINTS_FIELD, RANK_FIELD],
+      fields: ['summary', 'status', 'issuelinks', 'resolutiondate', STORY_POINTS_FIELD, RANK_FIELD],
       maxResults: 100,
     };
     if (nextPageToken) params.nextPageToken = nextPageToken;
@@ -100,6 +107,7 @@ function normalizeIssue(issue) {
     status: issue.fields.status?.name,
     points: issue.fields[STORY_POINTS_FIELD] || 0,
     rank: issue.fields[RANK_FIELD] || '',
+    resolvedAt: issue.fields.resolutiondate || null,
     blockedBy,
   };
 }
