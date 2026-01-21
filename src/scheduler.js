@@ -215,20 +215,19 @@ export function assignToPeople(sprint, maxSeq, numPeople) {
         p.tasks.push(...group.tasks);
         p.points += group.points;
         for (const task of group.tasks) assignment.set(task.key, idx);
-      } else {
-        // No single person can fit - distribute to person with most capacity
-        const byCapacity = people.map((p, idx) => ({ p, idx })).sort((a, b) => a.p.points - b.p.points);
-        const { p, idx } = byCapacity[0];
-        p.tasks.push(...group.tasks);
-        p.points += group.points;
-        for (const task of group.tasks) assignment.set(task.key, idx);
+        continue;
       }
-    } else {
+      // No single person can fit - fall through to splitting code
+    }
+
+    {
       // Group exceeds maxSeq - need to split while minimizing cross-person dependencies
       const sprintKeys = new Set(sprint.map((i) => i.key));
       const groupKeys = new Set(group.tasks.map((t) => t.key));
       const taskMap = new Map(group.tasks.map((t) => [t.key, t]));
       const localDepth = new Map();
+      const taskEndTime = new Map(); // taskKey -> completion time
+      const personEndTime = people.map(() => 0); // person idx -> current end time
 
       function calcLocalDepth(task) {
         if (localDepth.has(task.key)) return localDepth.get(task.key);
@@ -259,27 +258,42 @@ export function assignToPeople(sprint, maxSeq, numPeople) {
           }
         }
 
-        // Sort people by: most blockers (desc), then fewest points (asc)
-        const candidates = people
-          .map((p, idx) => ({
+        // Calculate wait time from external blockers
+        let maxExternalBlockerEnd = 0;
+        for (const blocker of localBlockers) {
+          const blockerPerson = assignment.get(blocker);
+          if (blockerPerson !== undefined) {
+            maxExternalBlockerEnd = Math.max(maxExternalBlockerEnd, taskEndTime.get(blocker) || 0);
+          }
+        }
+
+        // Hard filter on canFit, then sort by blockers and points
+        const allCandidates = people.map((p, idx) => {
+          const startTime = Math.max(personEndTime[idx], maxExternalBlockerEnd);
+          return {
             p,
             idx,
             blockerCount: blockerCountByPerson.get(idx) || 0,
-            canFit: p.points + task.points <= maxSeq,
-          }))
-          .sort((a, b) => {
-            // Prefer person with more blockers
-            if (b.blockerCount !== a.blockerCount) return b.blockerCount - a.blockerCount;
-            // Then prefer person who can fit the task
-            if (a.canFit !== b.canFit) return a.canFit ? -1 : 1;
-            // Then prefer person with fewer points
-            return a.p.points - b.p.points;
-          });
+            startTime,
+            canFit: startTime + task.points <= maxSeq,
+          };
+        });
+        const eligible = allCandidates.filter((c) => c.canFit);
+        const candidates = (eligible.length > 0 ? eligible : allCandidates).sort((a, b) => {
+          // Prefer person with more blockers
+          if (b.blockerCount !== a.blockerCount) return b.blockerCount - a.blockerCount;
+          // Then prefer person with fewer points
+          return a.p.points - b.p.points;
+        });
 
-        const { p, idx } = candidates[0];
+        const { p, idx, startTime } = candidates[0];
         p.tasks.push(task);
         p.points += task.points;
         assignment.set(task.key, idx);
+
+        const endTime = startTime + task.points;
+        taskEndTime.set(task.key, endTime);
+        personEndTime[idx] = endTime;
       }
     }
   }
